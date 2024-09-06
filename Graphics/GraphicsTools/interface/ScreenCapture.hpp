@@ -46,6 +46,8 @@ public:
 
     void Capture(ISwapChain* pSwapChain, IDeviceContext* pContext, Uint32 FrameId);
 
+    void Capture(ITextureView* pRTV, IDeviceContext* pContext, Uint32 FrameId);
+
     struct CaptureInfo
     {
         RefCntAutoPtr<ITexture> pTexture;

@@ -40,9 +40,13 @@ ScreenCapture::ScreenCapture(IRenderDevice* pDevice) :
 
 void ScreenCapture::Capture(ISwapChain* pSwapChain, IDeviceContext* pContext, Uint32 FrameId)
 {
-    auto*       pCurrentRTV        = pSwapChain->GetCurrentBackBufferRTV();
-    auto*       pCurrentBackBuffer = pCurrentRTV->GetTexture();
-    const auto& SCDesc             = pSwapChain->GetDesc();
+    this->Capture(pSwapChain->GetCurrentBackBufferRTV(), pContext, FrameId);
+}
+
+void ScreenCapture::Capture(ITextureView* pRTV, IDeviceContext* pContext, Uint32 FrameId)
+{
+    auto*       pCurrentBackBuffer = pRTV->GetTexture();
+    const auto& SCDesc             = pCurrentBackBuffer->GetDesc();
 
     RefCntAutoPtr<ITexture> pStagingTexture;
 
@@ -55,7 +59,7 @@ void ScreenCapture::Capture(ISwapChain* pSwapChain, IDeviceContext* pContext, Ui
             const auto& TexDesc = pStagingTexture->GetDesc();
             if (!(TexDesc.Width == SCDesc.Width &&
                   TexDesc.Height == SCDesc.Height &&
-                  TexDesc.Format == SCDesc.ColorBufferFormat))
+                  TexDesc.Format == SCDesc.Format))
             {
                 pStagingTexture.Release();
             }
@@ -69,7 +73,7 @@ void ScreenCapture::Capture(ISwapChain* pSwapChain, IDeviceContext* pContext, Ui
         TexDesc.Type           = RESOURCE_DIM_TEX_2D;
         TexDesc.Width          = SCDesc.Width;
         TexDesc.Height         = SCDesc.Height;
-        TexDesc.Format         = SCDesc.ColorBufferFormat;
+        TexDesc.Format         = SCDesc.Format;
         TexDesc.Usage          = USAGE_STAGING;
         TexDesc.CPUAccessFlags = CPU_ACCESS_READ;
         m_pDevice->CreateTexture(TexDesc, nullptr, &pStagingTexture);
