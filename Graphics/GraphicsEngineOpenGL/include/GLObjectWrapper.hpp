@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -126,7 +126,29 @@ public:
         VERIFY_EXPR(Name != nullptr);
         if (glObjectLabel && m_uiHandle)
         {
-            glObjectLabel(m_CreateReleaseHelper.Type, m_uiHandle, -1, Name);
+            static GLint MaxLabelLen = 0;
+            if (MaxLabelLen == 0)
+            {
+                glGetIntegerv(GL_MAX_LABEL_LENGTH, &MaxLabelLen);
+#    ifdef DILIGENT_DEVELOPMENT
+                glGetError(); // Ignore GL error
+#    endif
+                if (MaxLabelLen <= 0)
+                {
+                    // Minimum required value by the spec
+                    MaxLabelLen = 256;
+                }
+
+                // The spec requires that the number of characters in <label>,
+                // excluding the null terminator, is less than the value of MAX_LABEL_LENGTH.
+                // In other words, the maximum length of the label is one less than the value of MAX_LABEL_LENGTH.
+                --MaxLabelLen;
+            }
+            GLsizei Length = static_cast<GLsizei>(strlen(Name));
+            if (Length > MaxLabelLen)
+                Length = MaxLabelLen;
+
+            glObjectLabel(m_CreateReleaseHelper.Type, m_uiHandle, Length, Name);
 #    ifdef DILIGENT_DEVELOPMENT
             glGetError(); // Ignore GL error
 #    endif
@@ -170,7 +192,7 @@ public:
 private:
     GLuint m_ExternalGLBufferHandle;
 };
-typedef GLObjWrapper<GLBufferObjCreateReleaseHelper> GLBufferObj;
+using GLBufferObj = GLObjWrapper<GLBufferObjCreateReleaseHelper>;
 
 
 class GLProgramObjCreateReleaseHelper
@@ -182,7 +204,7 @@ public:
     static const char* Name;
     static GLenum      Type;
 };
-typedef GLObjWrapper<GLProgramObjCreateReleaseHelper> GLProgramObj;
+using GLProgramObj = GLObjWrapper<GLProgramObjCreateReleaseHelper>;
 
 
 class GLShaderObjCreateReleaseHelper
@@ -199,7 +221,7 @@ public:
 private:
     GLenum m_ShaderType;
 };
-typedef GLObjWrapper<GLShaderObjCreateReleaseHelper> GLShaderObj;
+using GLShaderObj = GLObjWrapper<GLShaderObjCreateReleaseHelper>;
 
 
 class GLPipelineObjCreateReleaseHelper
@@ -211,7 +233,7 @@ public:
     static const char* Name;
     static GLenum      Type;
 };
-typedef GLObjWrapper<GLPipelineObjCreateReleaseHelper> GLPipelineObj;
+using GLPipelineObj = GLObjWrapper<GLPipelineObjCreateReleaseHelper>;
 
 
 class GLVAOCreateReleaseHelper
@@ -223,7 +245,7 @@ public:
     static const char* Name;
     static GLenum      Type;
 };
-typedef GLObjWrapper<GLVAOCreateReleaseHelper> GLVertexArrayObj;
+using GLVertexArrayObj = GLObjWrapper<GLVAOCreateReleaseHelper>;
 
 
 class GLTextureCreateReleaseHelper
@@ -255,7 +277,7 @@ public:
 private:
     GLuint m_ExternalGLTextureHandle;
 };
-typedef GLObjWrapper<GLTextureCreateReleaseHelper> GLTextureObj;
+using GLTextureObj = GLObjWrapper<GLTextureCreateReleaseHelper>;
 
 class GLSamplerCreateReleaseHelper
 {
@@ -266,7 +288,7 @@ public:
     static const char* Name;
     static GLenum      Type;
 };
-typedef GLObjWrapper<GLSamplerCreateReleaseHelper> GLSamplerObj;
+using GLSamplerObj = GLObjWrapper<GLSamplerCreateReleaseHelper>;
 
 
 class GLFBOCreateReleaseHelper
@@ -298,7 +320,95 @@ public:
 private:
     GLuint m_ExternalFBOHandle;
 };
-typedef GLObjWrapper<GLFBOCreateReleaseHelper> GLFrameBufferObj;
+
+class GLFrameBufferObj : public GLObjWrapper<GLFBOCreateReleaseHelper>
+{
+public:
+    using TBase = GLObjWrapper<GLFBOCreateReleaseHelper>;
+
+    explicit GLFrameBufferObj(bool CreateObject, GLFBOCreateReleaseHelper CreateReleaseHelper = GLFBOCreateReleaseHelper{}) :
+        TBase{CreateObject, CreateReleaseHelper}
+    {}
+
+    GLFrameBufferObj(GLFrameBufferObj&& Wrapper) noexcept :
+        TBase{std::move(Wrapper)},
+        m_NumDrawBuffers{Wrapper.m_NumDrawBuffers},
+        m_DrawBuffersMask{Wrapper.m_DrawBuffersMask}
+    {
+        Wrapper.m_NumDrawBuffers  = 0;
+        Wrapper.m_DrawBuffersMask = 0;
+    }
+
+    GLFrameBufferObj& operator=(GLFrameBufferObj&& Wrapper) noexcept
+    {
+        TBase::operator=(std::move(Wrapper));
+
+        m_NumDrawBuffers  = Wrapper.m_NumDrawBuffers;
+        m_DrawBuffersMask = Wrapper.m_DrawBuffersMask;
+
+        Wrapper.m_NumDrawBuffers  = 0;
+        Wrapper.m_DrawBuffersMask = 0;
+        return *this;
+    }
+
+    // clang-format off
+    GLFrameBufferObj           (const GLFrameBufferObj&) = delete;
+    GLFrameBufferObj& operator=(const GLFrameBufferObj&) = delete;
+    // clang-format on
+
+    void SetDrawBuffers(uint32_t NumDrawBuffers, uint32_t DrawBuffersMask = ~0u)
+    {
+        if (!*this)
+        {
+            UNEXPECTED("Setting draw buffers on the default FBO is not allowed");
+            return;
+        }
+
+        if (NumDrawBuffers == ~0u)
+        {
+            if (m_NumDrawBuffers == ~0u)
+            {
+                UNEXPECTED("Number of draw buffers is not set. Using ~0u as NumDrawBuffers is not allowed");
+                return;
+            }
+            NumDrawBuffers = m_NumDrawBuffers;
+        }
+
+        if (NumDrawBuffers == 0)
+            return;
+
+        DrawBuffersMask &= (1u << NumDrawBuffers) - 1u;
+        if (m_NumDrawBuffers == NumDrawBuffers && m_DrawBuffersMask == DrawBuffersMask)
+            return;
+
+        m_NumDrawBuffers  = NumDrawBuffers;
+        m_DrawBuffersMask = DrawBuffersMask;
+
+        GLenum DrawBuffers[8];
+        VERIFY_EXPR(m_NumDrawBuffers <= _countof(DrawBuffers));
+        for (uint32_t rt = 0; rt < m_NumDrawBuffers; ++rt)
+            DrawBuffers[rt] = (m_DrawBuffersMask & (1u << rt)) ? GL_COLOR_ATTACHMENT0 + rt : GL_NONE;
+
+        // The state set by glDrawBuffers() is part of the state of the framebuffer.
+        glDrawBuffers(m_NumDrawBuffers, DrawBuffers);
+        DEV_CHECK_ERR(glGetError() == GL_NO_ERROR, "Failed to set draw buffers via glDrawBuffers()");
+    }
+
+    uint32_t GetNumDrawBuffers() const
+    {
+        VERIFY(m_NumDrawBuffers != ~0u, "Draw buffers were not set. Call SetDrawBuffers() first");
+        return m_NumDrawBuffers != ~0u ? m_NumDrawBuffers : 0;
+    }
+    uint32_t GetDrawBuffersMask() const
+    {
+        VERIFY(m_NumDrawBuffers != ~0u, "Draw buffers were not set. Call SetDrawBuffers() first");
+        return m_DrawBuffersMask;
+    }
+
+private:
+    uint32_t m_NumDrawBuffers  = ~0u;
+    uint32_t m_DrawBuffersMask = 0;
+};
 
 
 class GLRBOCreateReleaseHelper
@@ -310,7 +420,7 @@ public:
     static const char* Name;
     static GLenum      Type;
 };
-typedef GLObjWrapper<GLRBOCreateReleaseHelper> GLRenderBufferObj;
+using GLRenderBufferObj = GLObjWrapper<GLRBOCreateReleaseHelper>;
 
 struct GLSyncObj
 {
@@ -364,6 +474,6 @@ public:
     static const char* Name;
     static GLenum      Type;
 };
-typedef GLObjWrapper<GLQueryCreateReleaseHelper> GLQueryObj;
+using GLQueryObj = GLObjWrapper<GLQueryCreateReleaseHelper>;
 
 } // namespace GLObjectWrappers

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +34,7 @@
 #include "BasicMath.hpp"
 #include "Cast.hpp"
 #include "StringTools.hpp"
+#include "HashUtils.hpp"
 
 namespace Diligent
 {
@@ -130,7 +131,7 @@ public:
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_RGB10A2_UINT,            RGB10A2_UINT,  RGB10A2_UINT,  UNKNOWN, RGB10A2_UINT);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_R11G11B10_FLOAT,         R11G11B10_FLOAT, R11G11B10_FLOAT, UNKNOWN, R11G11B10_FLOAT);
 
-        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_RGBA8_TYPELESS,          RGBA8_UNORM_SRGB, RGBA8_UNORM_SRGB, UNKNOWN, RGBA8_UNORM);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_RGBA8_TYPELESS,          RGBA8_UNORM,      RGBA8_UNORM,      UNKNOWN, RGBA8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_RGBA8_UNORM,             RGBA8_UNORM,      RGBA8_UNORM,      UNKNOWN, RGBA8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_RGBA8_UNORM_SRGB,        RGBA8_UNORM_SRGB, RGBA8_UNORM_SRGB, UNKNOWN, RGBA8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_RGBA8_UINT,              RGBA8_UINT,       RGBA8_UINT,       UNKNOWN, RGBA8_UINT);
@@ -205,7 +206,7 @@ public:
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRA8_UNORM,             BGRA8_UNORM,    BGRA8_UNORM,     UNKNOWN, BGRA8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRX8_UNORM,             BGRX8_UNORM,    BGRX8_UNORM,     UNKNOWN, BGRX8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_R10G10B10_XR_BIAS_A2_UNORM, R10G10B10_XR_BIAS_A2_UNORM, UNKNOWN, UNKNOWN, UNKNOWN);
-        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRA8_TYPELESS,          BGRA8_UNORM_SRGB, BGRA8_UNORM_SRGB, UNKNOWN, BGRA8_UNORM);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRA8_TYPELESS,          BGRA8_UNORM,      BGRA8_UNORM,      UNKNOWN, BGRA8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRA8_UNORM_SRGB,        BGRA8_UNORM_SRGB, BGRA8_UNORM_SRGB, UNKNOWN, BGRA8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRX8_TYPELESS,          BGRX8_UNORM_SRGB, BGRX8_UNORM_SRGB, UNKNOWN, BGRX8_UNORM);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BGRX8_UNORM_SRGB,        BGRX8_UNORM_SRGB, BGRX8_UNORM_SRGB, UNKNOWN, BGRX8_UNORM);
@@ -216,11 +217,20 @@ public:
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BC7_TYPELESS,            BC7_UNORM_SRGB, UNKNOWN, UNKNOWN, UNKNOWN);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BC7_UNORM,               BC7_UNORM,      UNKNOWN, UNKNOWN, UNKNOWN);
         INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_BC7_UNORM_SRGB,          BC7_UNORM_SRGB, UNKNOWN, UNKNOWN, UNKNOWN);
+
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8_UNORM,         ETC2_RGB8_UNORM,        UNKNOWN, UNKNOWN, UNKNOWN);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8_UNORM_SRGB,    ETC2_RGB8_UNORM_SRGB,   UNKNOWN, UNKNOWN, UNKNOWN);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8A1_UNORM,       ETC2_RGB8A1_UNORM,      UNKNOWN, UNKNOWN, UNKNOWN);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB,  ETC2_RGB8A1_UNORM_SRGB, UNKNOWN, UNKNOWN, UNKNOWN);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_ETC2_RGBA8_UNORM,        ETC2_RGBA8_UNORM,       UNKNOWN, UNKNOWN, UNKNOWN);
+        INIT_TEX_VIEW_FORMAT_INFO(TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB,   ETC2_RGBA8_UNORM_SRGB,  UNKNOWN, UNKNOWN, UNKNOWN);
 #undef INIT_TVIEW_FORMAT_INFO
         // clang-format on
 
-        m_ViewFormats[TEX_FORMAT_R8_UINT][TEXTURE_VIEW_SHADING_RATE - 1]   = TEX_FORMAT_R8_UINT;
-        m_ViewFormats[TEX_FORMAT_RG8_UNORM][TEXTURE_VIEW_SHADING_RATE - 1] = TEX_FORMAT_RG8_UNORM;
+        m_ViewFormats[TEX_FORMAT_R8_TYPELESS][TEXTURE_VIEW_SHADING_RATE - 1]  = TEX_FORMAT_R8_UINT;
+        m_ViewFormats[TEX_FORMAT_R8_UINT][TEXTURE_VIEW_SHADING_RATE - 1]      = TEX_FORMAT_R8_UINT;
+        m_ViewFormats[TEX_FORMAT_RG8_TYPELESS][TEXTURE_VIEW_SHADING_RATE - 1] = TEX_FORMAT_RG8_UNORM;
+        m_ViewFormats[TEX_FORMAT_RG8_UNORM][TEXTURE_VIEW_SHADING_RATE - 1]    = TEX_FORMAT_RG8_UNORM;
     }
 
     TEXTURE_FORMAT GetViewFormat(TEXTURE_FORMAT Format, TEXTURE_VIEW_TYPE ViewType, Uint32 BindFlags)
@@ -399,9 +409,16 @@ const TextureFormatAttribs& GetTextureFormatAttribs(TEXTURE_FORMAT Format)
             INIT_TEX_FORMAT_INFO(TEX_FORMAT_BC7_TYPELESS,            16, 4, COMPONENT_TYPE_COMPRESSED,  true, 4,4);
             INIT_TEX_FORMAT_INFO(TEX_FORMAT_BC7_UNORM,               16, 4, COMPONENT_TYPE_COMPRESSED, false, 4,4);
             INIT_TEX_FORMAT_INFO(TEX_FORMAT_BC7_UNORM_SRGB,          16, 4, COMPONENT_TYPE_COMPRESSED, false, 4,4);
+
+            INIT_TEX_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8_UNORM,         8,  3, COMPONENT_TYPE_COMPRESSED, false, 4,4);
+            INIT_TEX_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8_UNORM_SRGB,    8,  3, COMPONENT_TYPE_COMPRESSED, false, 4,4);
+            INIT_TEX_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8A1_UNORM,       8,  4, COMPONENT_TYPE_COMPRESSED, false, 4,4);
+            INIT_TEX_FORMAT_INFO(TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB,  8,  4, COMPONENT_TYPE_COMPRESSED, false, 4,4);
+            INIT_TEX_FORMAT_INFO(TEX_FORMAT_ETC2_RGBA8_UNORM,        16, 4, COMPONENT_TYPE_COMPRESSED, false, 4,4);
+            INIT_TEX_FORMAT_INFO(TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB,   16, 4, COMPONENT_TYPE_COMPRESSED, false, 4,4);
 #undef  INIT_TEX_FORMAT_INFO
             // clang-format on
-            static_assert(TEX_FORMAT_NUM_FORMATS == TEX_FORMAT_BC7_UNORM_SRGB + 1, "Not all texture formats initialized.");
+            static_assert(TEX_FORMAT_NUM_FORMATS == 106, "Not all texture formats initialized.");
 
 #ifdef DILIGENT_DEBUG
             for (Uint32 Fmt = TEX_FORMAT_UNKNOWN; Fmt < TEX_FORMAT_NUM_FORMATS; ++Fmt)
@@ -413,7 +430,7 @@ const TextureFormatAttribs& GetTextureFormatAttribs(TEXTURE_FORMAT Format)
         {
             if (Format >= TEX_FORMAT_UNKNOWN && Format < TEX_FORMAT_NUM_FORMATS)
             {
-                const auto& Attribs = FmtAttribs[Format];
+                const TextureFormatAttribs& Attribs = FmtAttribs[Format];
                 VERIFY(Attribs.Format == Format, "Unexpected format");
                 return Attribs;
             }
@@ -1254,7 +1271,7 @@ String GetTextureDescString(const TextureDesc& Desc)
         Str += ToString(Desc.ArraySize);
     }
 
-    auto FmtName = GetTextureFormatAttribs(Desc.Format).Name;
+    const char* FmtName = GetTextureFormatAttribs(Desc.Format).Name;
     Str += "; Format: ";
     Str += FmtName;
 
@@ -1429,9 +1446,9 @@ String GetResourceStateString(RESOURCE_STATE State)
         if (!str.empty())
             str.push_back('|');
 
-        auto lsb = State & ~(State - 1);
+        Uint32 lsb = State & ~(State - 1);
 
-        const auto* StateFlagString = GetResourceStateFlagString(static_cast<RESOURCE_STATE>(lsb));
+        const char* StateFlagString = GetResourceStateFlagString(static_cast<RESOURCE_STATE>(lsb));
         str.append(StateFlagString);
         State = static_cast<RESOURCE_STATE>(State & ~lsb);
     }
@@ -1712,7 +1729,7 @@ static void PrintShaderCodeVariables(std::stringstream& ss, size_t LevelIdent, s
     int MaxBasicTypeLen = 0;
     for (Uint32 i = 0; i < NumVars; ++i)
     {
-        const auto& Var = pVars[i];
+        const ShaderCodeVariableDesc& Var = pVars[i];
         if (Var.Name != nullptr)
             MaxNameLen = std::max(MaxNameLen, static_cast<int>(strlen(Var.Name)));
         if (Var.TypeName != nullptr)
@@ -1725,7 +1742,7 @@ static void PrintShaderCodeVariables(std::stringstream& ss, size_t LevelIdent, s
 
     for (Uint32 i = 0; i < NumVars; ++i)
     {
-        const auto& Var = pVars[i];
+        const ShaderCodeVariableDesc& Var = pVars[i];
         ss << std::setw(static_cast<int>(LevelIdent) + MaxNameLen) << (Var.Name ? Var.Name : "?")
            << ": " << std::setw(MaxTypeLen) << (Var.TypeName ? Var.TypeName : "")
            << ' ' << std::setw(MaxClassLen) << GetShaderCodeVariableClassString(Var.Class)
@@ -1850,7 +1867,7 @@ BIND_FLAGS SwapChainUsageFlagsToBindFlags(SWAP_CHAIN_USAGE_FLAGS SwapChainUsage)
     static_assert(SWAP_CHAIN_USAGE_LAST == 8, "Did you add a new swap chain usage flag? Please handle it here.");
     while (SwapChainUsage != SWAP_CHAIN_USAGE_NONE)
     {
-        auto SCUsageBit = ExtractLSB(SwapChainUsage);
+        SWAP_CHAIN_USAGE_FLAGS SCUsageBit = ExtractLSB(SwapChainUsage);
         switch (SCUsageBit)
         {
             case SWAP_CHAIN_USAGE_RENDER_TARGET:
@@ -1870,7 +1887,7 @@ BIND_FLAGS SwapChainUsageFlagsToBindFlags(SWAP_CHAIN_USAGE_FLAGS SwapChainUsage)
                 break;
 
             default:
-                UNEXPECTED("Unexpeced swap chain usage flag");
+                UNEXPECTED("Unexpected swap chain usage flag");
         }
     }
     return BindFlags;
@@ -2040,8 +2057,8 @@ if ( (State & ExclusiveState) != 0 && (State & ~ExclusiveState) != 0 )\
 
 MipLevelProperties GetMipLevelProperties(const TextureDesc& TexDesc, Uint32 MipLevel)
 {
-    MipLevelProperties MipProps;
-    const auto&        FmtAttribs = GetTextureFormatAttribs(TexDesc.Format);
+    MipLevelProperties          MipProps;
+    const TextureFormatAttribs& FmtAttribs = GetTextureFormatAttribs(TexDesc.Format);
 
     MipProps.LogicalWidth  = std::max(TexDesc.GetWidth() >> MipLevel, 1u);
     MipProps.LogicalHeight = std::max(TexDesc.GetHeight() >> MipLevel, 1u);
@@ -2352,7 +2369,7 @@ Uint64 GetStagingTextureLocationOffset(const TextureDesc& TexDesc,
         Uint64 ArraySliceSize = 0;
         for (Uint32 mip = 0; mip < TexDesc.MipLevels; ++mip)
         {
-            auto MipInfo = GetMipLevelProperties(TexDesc, mip);
+            MipLevelProperties MipInfo = GetMipLevelProperties(TexDesc, mip);
             ArraySliceSize += AlignUp(MipInfo.MipSize, Alignment);
         }
 
@@ -2363,7 +2380,7 @@ Uint64 GetStagingTextureLocationOffset(const TextureDesc& TexDesc,
 
     for (Uint32 mip = 0; mip < MipLevel; ++mip)
     {
-        auto MipInfo = GetMipLevelProperties(TexDesc, mip);
+        MipLevelProperties MipInfo = GetMipLevelProperties(TexDesc, mip);
         Offset += AlignUp(MipInfo.MipSize, Alignment);
     }
 
@@ -2374,8 +2391,8 @@ Uint64 GetStagingTextureLocationOffset(const TextureDesc& TexDesc,
     }
     else if (LocationX != 0 || LocationY != 0 || LocationZ != 0)
     {
-        const auto& MipLevelAttribs = GetMipLevelProperties(TexDesc, MipLevel);
-        const auto& FmtAttribs      = GetTextureFormatAttribs(TexDesc.Format);
+        const MipLevelProperties&   MipLevelAttribs = GetMipLevelProperties(TexDesc, MipLevel);
+        const TextureFormatAttribs& FmtAttribs      = GetTextureFormatAttribs(TexDesc.Format);
         VERIFY(LocationX < MipLevelAttribs.LogicalWidth && LocationY < MipLevelAttribs.LogicalHeight && LocationZ < MipLevelAttribs.Depth,
                "Specified location is out of bounds");
         if (FmtAttribs.ComponentType == COMPONENT_TYPE_COMPRESSED)
@@ -2405,18 +2422,18 @@ BufferToTextureCopyInfo GetBufferToTextureCopyInfo(TEXTURE_FORMAT Format,
 {
     BufferToTextureCopyInfo CopyInfo;
 
-    const auto& FmtAttribs = GetTextureFormatAttribs(Format);
+    const TextureFormatAttribs& FmtAttribs = GetTextureFormatAttribs(Format);
     VERIFY_EXPR(Region.IsValid());
-    const auto UpdateRegionWidth  = Region.Width();
-    const auto UpdateRegionHeight = Region.Height();
-    const auto UpdateRegionDepth  = Region.Depth();
+    const Uint32 UpdateRegionWidth  = Region.Width();
+    const Uint32 UpdateRegionHeight = Region.Height();
+    const Uint32 UpdateRegionDepth  = Region.Depth();
     if (FmtAttribs.ComponentType == COMPONENT_TYPE_COMPRESSED)
     {
         // Align update region size by the block size
         VERIFY_EXPR(IsPowerOfTwo(FmtAttribs.BlockWidth));
         VERIFY_EXPR(IsPowerOfTwo(FmtAttribs.BlockHeight));
-        const auto BlockAlignedRegionWidth  = AlignUp(UpdateRegionWidth, Uint32{FmtAttribs.BlockWidth});
-        const auto BlockAlignedRegionHeight = AlignUp(UpdateRegionHeight, Uint32{FmtAttribs.BlockHeight});
+        const Uint32 BlockAlignedRegionWidth  = AlignUp(UpdateRegionWidth, Uint32{FmtAttribs.BlockWidth});
+        const Uint32 BlockAlignedRegionHeight = AlignUp(UpdateRegionHeight, Uint32{FmtAttribs.BlockHeight});
 
         CopyInfo.RowSize  = Uint64{BlockAlignedRegionWidth} / Uint32{FmtAttribs.BlockWidth} * Uint32{FmtAttribs.ComponentSize};
         CopyInfo.RowCount = BlockAlignedRegionHeight / FmtAttribs.BlockHeight;
@@ -2458,8 +2475,8 @@ void CopyTextureSubresource(const TextureSubResData& SrcSubres,
     VERIFY(DstRowStride >= RowSize, "Dst data row stride (", DstRowStride, ") is smaller than the row size (", RowSize, ")");
     for (Uint32 z = 0; z < NumDepthSlices; ++z)
     {
-        const auto* pSrcSlice = reinterpret_cast<const Uint8*>(SrcSubres.pData) + SrcSubres.DepthStride * z;
-        auto*       pDstSlice = reinterpret_cast<Uint8*>(pDstData) + DstDepthStride * z;
+        const Uint8* pSrcSlice = reinterpret_cast<const Uint8*>(SrcSubres.pData) + SrcSubres.DepthStride * z;
+        Uint8*       pDstSlice = reinterpret_cast<Uint8*>(pDstData) + DstDepthStride * z;
 
         for (Uint32 y = 0; y < NumRows; ++y)
         {
@@ -2545,6 +2562,7 @@ const Char* GetPipelineStateStatusString(PIPELINE_STATE_STATUS PipelineStatus, b
 
 TEXTURE_FORMAT UnormFormatToSRGB(TEXTURE_FORMAT Fmt)
 {
+    static_assert(TEX_FORMAT_NUM_FORMATS == 106, "Please update the switch below to handle the new texture format, if needed");
     switch (Fmt)
     {
         case TEX_FORMAT_RGBA8_UNORM:
@@ -2568,6 +2586,15 @@ TEXTURE_FORMAT UnormFormatToSRGB(TEXTURE_FORMAT Fmt)
         case TEX_FORMAT_BC7_UNORM:
             return TEX_FORMAT_BC7_UNORM_SRGB;
 
+        case TEX_FORMAT_ETC2_RGB8_UNORM:
+            return TEX_FORMAT_ETC2_RGB8_UNORM_SRGB;
+
+        case TEX_FORMAT_ETC2_RGB8A1_UNORM:
+            return TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB;
+
+        case TEX_FORMAT_ETC2_RGBA8_UNORM:
+            return TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB;
+
         default:
             return Fmt;
     }
@@ -2575,6 +2602,7 @@ TEXTURE_FORMAT UnormFormatToSRGB(TEXTURE_FORMAT Fmt)
 
 TEXTURE_FORMAT SRGBFormatToUnorm(TEXTURE_FORMAT Fmt)
 {
+    static_assert(TEX_FORMAT_NUM_FORMATS == 106, "Please update the switch below to handle the new texture format, if needed");
     switch (Fmt)
     {
         case TEX_FORMAT_RGBA8_UNORM_SRGB:
@@ -2598,6 +2626,144 @@ TEXTURE_FORMAT SRGBFormatToUnorm(TEXTURE_FORMAT Fmt)
         case TEX_FORMAT_BC7_UNORM_SRGB:
             return TEX_FORMAT_BC7_UNORM;
 
+        case TEX_FORMAT_ETC2_RGB8_UNORM_SRGB:
+            return TEX_FORMAT_ETC2_RGB8_UNORM;
+
+        case TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB:
+            return TEX_FORMAT_ETC2_RGB8A1_UNORM;
+
+        case TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB:
+            return TEX_FORMAT_ETC2_RGBA8_UNORM;
+
+        default:
+            return Fmt;
+    }
+}
+
+TEXTURE_FORMAT BCFormatToUncompressed(TEXTURE_FORMAT Fmt)
+{
+    switch (Fmt)
+    {
+        // RGB 5:6:5 + 1 bit alpha
+        case TEX_FORMAT_BC1_TYPELESS:
+            return TEX_FORMAT_RGBA8_TYPELESS;
+        case TEX_FORMAT_BC1_UNORM:
+            return TEX_FORMAT_RGBA8_UNORM;
+        case TEX_FORMAT_BC1_UNORM_SRGB:
+            return TEX_FORMAT_RGBA8_UNORM_SRGB;
+
+        // RGB 5:6:5 + 4 bit alpha
+        case TEX_FORMAT_BC2_TYPELESS:
+            return TEX_FORMAT_RGBA8_TYPELESS;
+        case TEX_FORMAT_BC2_UNORM:
+            return TEX_FORMAT_RGBA8_UNORM;
+        case TEX_FORMAT_BC2_UNORM_SRGB:
+            return TEX_FORMAT_RGBA8_UNORM_SRGB;
+
+        // RGB 5:6:5 + 8 bit alpha
+        case TEX_FORMAT_BC3_TYPELESS:
+            return TEX_FORMAT_RGBA8_TYPELESS;
+        case TEX_FORMAT_BC3_UNORM:
+            return TEX_FORMAT_RGBA8_UNORM;
+        case TEX_FORMAT_BC3_UNORM_SRGB:
+            return TEX_FORMAT_RGBA8_UNORM_SRGB;
+
+        // R8
+        case TEX_FORMAT_BC4_TYPELESS:
+            return TEX_FORMAT_R8_TYPELESS;
+        case TEX_FORMAT_BC4_UNORM:
+            return TEX_FORMAT_R8_UNORM;
+        case TEX_FORMAT_BC4_SNORM:
+            return TEX_FORMAT_R8_SNORM;
+
+        // RG 8:8
+        case TEX_FORMAT_BC5_TYPELESS:
+            return TEX_FORMAT_RG8_TYPELESS;
+        case TEX_FORMAT_BC5_UNORM:
+            return TEX_FORMAT_RG8_UNORM;
+        case TEX_FORMAT_BC5_SNORM:
+            return TEX_FORMAT_RG8_SNORM;
+
+        default:
+            return TEX_FORMAT_UNKNOWN;
+    }
+}
+
+TEXTURE_FORMAT TypelessFormatToUnorm(TEXTURE_FORMAT Fmt)
+{
+    static_assert(TEX_FORMAT_NUM_FORMATS == 106, "Please update the switch below to handle the new texture format, if needed");
+    switch (Fmt)
+    {
+        case TEX_FORMAT_R8_TYPELESS:
+            return TEX_FORMAT_R8_UNORM;
+
+        case TEX_FORMAT_RG8_TYPELESS:
+            return TEX_FORMAT_RG8_UNORM;
+
+        case TEX_FORMAT_RGBA8_TYPELESS:
+            return TEX_FORMAT_RGBA8_UNORM;
+
+        case TEX_FORMAT_BGRA8_TYPELESS:
+            return TEX_FORMAT_BGRA8_UNORM;
+
+        case TEX_FORMAT_BGRX8_TYPELESS:
+            return TEX_FORMAT_BGRX8_UNORM;
+
+        case TEX_FORMAT_R16_TYPELESS:
+            return TEX_FORMAT_R16_UNORM;
+
+        case TEX_FORMAT_RG16_TYPELESS:
+            return TEX_FORMAT_RG16_UNORM;
+
+        case TEX_FORMAT_RGBA16_TYPELESS:
+            return TEX_FORMAT_RGBA16_UNORM;
+
+        case TEX_FORMAT_BC1_TYPELESS:
+            return TEX_FORMAT_BC1_UNORM;
+
+        case TEX_FORMAT_BC2_TYPELESS:
+            return TEX_FORMAT_BC2_UNORM;
+
+        case TEX_FORMAT_BC3_TYPELESS:
+            return TEX_FORMAT_BC3_UNORM;
+
+        case TEX_FORMAT_BC4_TYPELESS:
+            return TEX_FORMAT_BC4_UNORM;
+
+        case TEX_FORMAT_BC5_TYPELESS:
+            return TEX_FORMAT_BC5_UNORM;
+
+        default:
+            return Fmt;
+    }
+}
+
+TEXTURE_FORMAT TypelessFormatToSRGB(TEXTURE_FORMAT Fmt)
+{
+    static_assert(TEX_FORMAT_NUM_FORMATS == 106, "Please update the switch below to handle the new texture format, if needed");
+    switch (Fmt)
+    {
+        case TEX_FORMAT_RGBA8_TYPELESS:
+            return TEX_FORMAT_RGBA8_UNORM_SRGB;
+
+        case TEX_FORMAT_BC1_TYPELESS:
+            return TEX_FORMAT_BC1_UNORM_SRGB;
+
+        case TEX_FORMAT_BC2_TYPELESS:
+            return TEX_FORMAT_BC2_UNORM_SRGB;
+
+        case TEX_FORMAT_BC3_TYPELESS:
+            return TEX_FORMAT_BC3_UNORM_SRGB;
+
+        case TEX_FORMAT_BGRA8_TYPELESS:
+            return TEX_FORMAT_BGRA8_UNORM_SRGB;
+
+        case TEX_FORMAT_BGRX8_TYPELESS:
+            return TEX_FORMAT_BGRX8_UNORM_SRGB;
+
+        case TEX_FORMAT_BC7_TYPELESS:
+            return TEX_FORMAT_BC7_UNORM_SRGB;
+
         default:
             return Fmt;
     }
@@ -2611,7 +2777,10 @@ bool IsSRGBFormat(TEXTURE_FORMAT Fmt)
             Fmt == TEX_FORMAT_BC3_UNORM_SRGB ||
             Fmt == TEX_FORMAT_BGRA8_UNORM_SRGB ||
             Fmt == TEX_FORMAT_BGRX8_UNORM_SRGB ||
-            Fmt == TEX_FORMAT_BC7_UNORM_SRGB);
+            Fmt == TEX_FORMAT_BC7_UNORM_SRGB ||
+            Fmt == TEX_FORMAT_ETC2_RGB8_UNORM_SRGB ||
+            Fmt == TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB ||
+            Fmt == TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB);
 }
 
 String GetPipelineShadingRateFlagsString(PIPELINE_SHADING_RATE_FLAGS Flags)
@@ -2622,7 +2791,7 @@ String GetPipelineShadingRateFlagsString(PIPELINE_SHADING_RATE_FLAGS Flags)
     String Result;
     while (Flags != PIPELINE_SHADING_RATE_FLAG_NONE)
     {
-        auto Bit = ExtractLSB(Flags);
+        PIPELINE_SHADING_RATE_FLAGS Bit = ExtractLSB(Flags);
 
         if (!Result.empty())
             Result += " | ";
@@ -2672,7 +2841,7 @@ bool TextureComponentMappingFromString(const String& MappingStr, TextureComponen
 
     for (size_t Comp = 0; Comp < MappingStr.length(); ++Comp)
     {
-        const auto Chr = MappingStr[Comp];
+        const char Chr = MappingStr[Comp];
         if (Chr == 'r' || Chr == 'R')
             Mapping[Comp] = Comp == 0 ? TEXTURE_COMPONENT_SWIZZLE_IDENTITY : TEXTURE_COMPONENT_SWIZZLE_R;
         else if (Chr == 'g' || Chr == 'G')
@@ -2693,9 +2862,9 @@ bool TextureComponentMappingFromString(const String& MappingStr, TextureComponen
 
 SparseTextureProperties GetStandardSparseTextureProperties(const TextureDesc& TexDesc)
 {
-    constexpr Uint32 SparseBlockSize = 64 << 10;
-    const auto&      FmtAttribs      = GetTextureFormatAttribs(TexDesc.Format);
-    const Uint32     TexelSize       = FmtAttribs.GetElementSize();
+    constexpr Uint32            SparseBlockSize = 64 << 10;
+    const TextureFormatAttribs& FmtAttribs      = GetTextureFormatAttribs(TexDesc.Format);
+    const Uint32                TexelSize       = FmtAttribs.GetElementSize();
     VERIFY_EXPR(IsPowerOfTwo(TexelSize));
     VERIFY_EXPR(TexelSize >= 1 && TexelSize <= 16);
     VERIFY_EXPR(TexDesc.Is2D() || TexDesc.Is3D());
@@ -2776,7 +2945,7 @@ SparseTextureProperties GetStandardSparseTextureProperties(const TextureDesc& Te
         }
     }
 
-    const auto BytesPerTile =
+    const Uint32 BytesPerTile =
         (Props.TileSize[0] / FmtAttribs.BlockWidth) *
         (Props.TileSize[1] / FmtAttribs.BlockHeight) *
         Props.TileSize[2] * TexDesc.SampleCount * TexelSize;
@@ -2786,14 +2955,14 @@ SparseTextureProperties GetStandardSparseTextureProperties(const TextureDesc& Te
     Props.FirstMipInTail = ~0u;
     for (Uint32 Mip = 0; Mip < TexDesc.MipLevels; ++Mip)
     {
-        const auto MipProps  = GetMipLevelProperties(TexDesc, Mip);
-        const auto MipWidth  = MipProps.StorageWidth;
-        const auto MipHeight = MipProps.StorageHeight;
-        const auto MipDepth  = MipProps.Depth;
+        const MipLevelProperties MipProps  = GetMipLevelProperties(TexDesc, Mip);
+        const Uint32             MipWidth  = MipProps.StorageWidth;
+        const Uint32             MipHeight = MipProps.StorageHeight;
+        const Uint32             MipDepth  = MipProps.Depth;
 
         // When the size of a texture mipmap level is at least one standard tile shape for its
         // format, the mipmap level is guaranteed to be nonpacked.
-        const auto IsUnpacked =
+        const bool IsUnpacked =
             MipWidth >= Props.TileSize[0] &&
             MipHeight >= Props.TileSize[1] &&
             MipDepth >= Props.TileSize[2];
@@ -2810,7 +2979,7 @@ SparseTextureProperties GetStandardSparseTextureProperties(const TextureDesc& Te
         }
         else
         {
-            const auto NumTilesInMip = GetNumSparseTilesInBox(Box{0, MipWidth, 0, MipHeight, 0, MipDepth}, Props.TileSize);
+            const uint3 NumTilesInMip = GetNumSparseTilesInBox(Box{0, MipWidth, 0, MipHeight, 0, MipDepth}, Props.TileSize);
             SliceSize += Uint64{NumTilesInMip.x} * NumTilesInMip.y * NumTilesInMip.z * SparseBlockSize;
         }
     }
@@ -2853,13 +3022,13 @@ std::vector<Uint32> ResolveInputLayoutAutoOffsetsAndStrides(LayoutElement* pLayo
 
     for (Uint32 i = 0; i < NumElements; ++i)
     {
-        auto& LayoutElem = pLayoutElements[i];
+        LayoutElement& LayoutElem = pLayoutElements[i];
 
         if (LayoutElem.ValueType == VT_FLOAT32 || LayoutElem.ValueType == VT_FLOAT16)
             LayoutElem.IsNormalized = false; // Floating point values cannot be normalized
 
-        auto  BuffSlot       = LayoutElem.BufferSlot;
-        auto& CurrAutoStride = TightStrides[BuffSlot];
+        Uint32  BuffSlot       = LayoutElem.BufferSlot;
+        Uint32& CurrAutoStride = TightStrides[BuffSlot];
         // If offset is not explicitly specified, use current auto stride value
         if (LayoutElem.RelativeOffset == LAYOUT_ELEMENT_AUTO_OFFSET)
         {
@@ -2886,9 +3055,9 @@ std::vector<Uint32> ResolveInputLayoutAutoOffsetsAndStrides(LayoutElement* pLayo
 
     for (Uint32 i = 0; i < NumElements; ++i)
     {
-        auto& LayoutElem = pLayoutElements[i];
+        LayoutElement& LayoutElem = pLayoutElements[i];
 
-        auto BuffSlot = LayoutElem.BufferSlot;
+        Uint32 BuffSlot = LayoutElem.BufferSlot;
         // If no input elements explicitly defined stride for this buffer slot, use automatic stride
         if (Strides[BuffSlot] == LAYOUT_ELEMENT_AUTO_STRIDE)
         {
@@ -2908,13 +3077,25 @@ std::vector<Uint32> ResolveInputLayoutAutoOffsetsAndStrides(LayoutElement* pLayo
     }
 
     // Set strides for all unused slots to 0
-    for (auto& Stride : Strides)
+    for (Uint32& Stride : Strides)
     {
         if (Stride == LAYOUT_ELEMENT_AUTO_STRIDE)
             Stride = 0;
     }
 
     return Strides;
+}
+
+size_t ComputeRenderTargetFormatsHash(Uint32 NumRenderTargets, const TEXTURE_FORMAT RTVFormats[], TEXTURE_FORMAT DSVFormat)
+{
+    if (NumRenderTargets == 0 && DSVFormat == TEX_FORMAT_UNKNOWN)
+        return 0;
+
+    size_t Hash = ComputeHash(NumRenderTargets);
+    for (Uint32 rt = 0; rt < NumRenderTargets; ++rt)
+        HashCombine(Hash, RTVFormats[rt]);
+    HashCombine(Hash, DSVFormat);
+    return Hash;
 }
 
 } // namespace Diligent

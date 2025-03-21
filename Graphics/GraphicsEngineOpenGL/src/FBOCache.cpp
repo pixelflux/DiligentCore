@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,7 +94,7 @@ FBOCache::~FBOCache()
 #ifdef DILIGENT_DEBUG
     for (const auto& fbo_it : m_Cache)
     {
-        const auto& Key = fbo_it.first;
+        const FBOCacheKey& Key = fbo_it.first;
         VERIFY(Key.NumRenderTargets == 0 && Key.DSId == 0, "Only framebuffers without attachments can be left in the cache");
     }
 #endif
@@ -105,7 +105,7 @@ void FBOCache::OnReleaseTexture(ITexture* pTexture)
 {
     Threading::SpinLockGuard CacheGuard{m_CacheLock};
 
-    auto* pTexGL = ClassPtrCast<TextureBaseGL>(pTexture);
+    TextureBaseGL* pTexGL = ClassPtrCast<TextureBaseGL>(pTexture);
     // Find all FBOs that this texture used in
     auto EqualRange = m_TexIdToKey.equal_range(pTexGL->GetUniqueID());
     for (auto It = EqualRange.first; It != EqualRange.second; ++It)
@@ -113,6 +113,14 @@ void FBOCache::OnReleaseTexture(ITexture* pTexture)
         m_Cache.erase(It->second);
     }
     m_TexIdToKey.erase(EqualRange.first, EqualRange.second);
+}
+
+void FBOCache::Clear()
+{
+    Threading::SpinLockGuard CacheGuard{m_CacheLock};
+
+    m_Cache.clear();
+    m_TexIdToKey.clear();
 }
 
 GLObjectWrappers::GLFrameBufferObj FBOCache::CreateFBO(GLContextState&    ContextState,
@@ -129,25 +137,25 @@ GLObjectWrappers::GLFrameBufferObj FBOCache::CreateFBO(GLContextState&    Contex
     // Initialize the FBO
     for (Uint32 rt = 0; rt < NumRenderTargets; ++rt)
     {
-        if (auto* pRTView = ppRTVs[rt])
+        if (TextureViewGLImpl* pRTView = ppRTVs[rt])
         {
-            const auto& RTVDesc     = pRTView->GetDesc();
-            auto*       pColorTexGL = pRTView->GetTexture<TextureBaseGL>();
+            const TextureViewDesc& RTVDesc     = pRTView->GetDesc();
+            TextureBaseGL*         pColorTexGL = pRTView->GetTexture<TextureBaseGL>();
             pColorTexGL->AttachToFramebuffer(RTVDesc, GL_COLOR_ATTACHMENT0 + rt, TextureBaseGL::FRAMEBUFFER_TARGET_FLAG_READ_DRAW);
         }
     }
 
     if (pDSV != nullptr)
     {
-        const auto& DSVDesc         = pDSV->GetDesc();
-        auto*       pDepthTexGL     = pDSV->GetTexture<TextureBaseGL>();
-        GLenum      AttachmentPoint = 0;
+        const TextureViewDesc& DSVDesc         = pDSV->GetDesc();
+        TextureBaseGL*         pDepthTexGL     = pDSV->GetTexture<TextureBaseGL>();
+        GLenum                 AttachmentPoint = 0;
         if (DSVDesc.Format == TEX_FORMAT_D32_FLOAT ||
             DSVDesc.Format == TEX_FORMAT_D16_UNORM)
         {
 #ifdef DILIGENT_DEBUG
             {
-                const auto GLTexFmt = pDepthTexGL->GetGLTexFormat();
+                const GLenum GLTexFmt = pDepthTexGL->GetGLTexFormat();
                 VERIFY(GLTexFmt == GL_DEPTH_COMPONENT32F || GLTexFmt == GL_DEPTH_COMPONENT16,
                        "Inappropriate internal texture format (", GLTexFmt,
                        ") for depth attachment. GL_DEPTH_COMPONENT32F or GL_DEPTH_COMPONENT16 is expected");
@@ -160,7 +168,7 @@ GLObjectWrappers::GLFrameBufferObj FBOCache::CreateFBO(GLContextState&    Contex
         {
 #ifdef DILIGENT_DEBUG
             {
-                const auto GLTexFmt = pDepthTexGL->GetGLTexFormat();
+                const GLenum GLTexFmt = pDepthTexGL->GetGLTexFormat();
                 VERIFY(GLTexFmt == GL_DEPTH24_STENCIL8 || GLTexFmt == GL_DEPTH32F_STENCIL8,
                        "Inappropriate internal texture format (", GLTexFmt,
                        ") for depth-stencil attachment. GL_DEPTH24_STENCIL8 or GL_DEPTH32F_STENCIL8 is expected");
@@ -181,33 +189,7 @@ GLObjectWrappers::GLFrameBufferObj FBOCache::CreateFBO(GLContextState&    Contex
 
     if (NumRenderTargets > 0)
     {
-        // We now need to set mapping between shader outputs and
-        // color attachments. This largely redundant step is performed
-        // by glDrawBuffers()
-        static constexpr GLenum DrawBuffers[] =
-            {
-                GL_COLOR_ATTACHMENT0,
-                GL_COLOR_ATTACHMENT1,
-                GL_COLOR_ATTACHMENT2,
-                GL_COLOR_ATTACHMENT3,
-                GL_COLOR_ATTACHMENT4,
-                GL_COLOR_ATTACHMENT5,
-                GL_COLOR_ATTACHMENT6,
-                GL_COLOR_ATTACHMENT7,
-                GL_COLOR_ATTACHMENT8,
-                GL_COLOR_ATTACHMENT9,
-                GL_COLOR_ATTACHMENT10,
-                GL_COLOR_ATTACHMENT11,
-                GL_COLOR_ATTACHMENT12,
-                GL_COLOR_ATTACHMENT13,
-                GL_COLOR_ATTACHMENT14,
-                GL_COLOR_ATTACHMENT15,
-            };
-
-        // The state set by glDrawBuffers() is part of the state of the framebuffer.
-        // So it can be set up once and left it set.
-        glDrawBuffers(NumRenderTargets, DrawBuffers);
-        DEV_CHECK_GL_ERROR("Failed to set draw buffers via glDrawBuffers()");
+        FBO.SetDrawBuffers(NumRenderTargets);
     }
     else if (pDSV == nullptr)
     {
@@ -243,10 +225,10 @@ GLObjectWrappers::GLFrameBufferObj FBOCache::CreateFBO(GLContextState&    Contex
     return FBO;
 }
 
-const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32             NumRenderTargets,
-                                                           TextureViewGLImpl* ppRTVs[],
-                                                           TextureViewGLImpl* pDSV,
-                                                           GLContextState&    ContextState)
+GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32             NumRenderTargets,
+                                                     TextureViewGLImpl* ppRTVs[],
+                                                     TextureViewGLImpl* pDSV,
+                                                     GLContextState&    ContextState)
 {
     // Pop null render targets from the end of the list
     while (NumRenderTargets > 0 && ppRTVs[NumRenderTargets - 1] == nullptr)
@@ -261,11 +243,11 @@ const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32             Nu
     Key.NumRenderTargets = NumRenderTargets;
     for (Uint32 rt = 0; rt < NumRenderTargets; ++rt)
     {
-        auto* pRTView = ppRTVs[rt];
+        TextureViewGLImpl* pRTView = ppRTVs[rt];
         if (pRTView == nullptr)
             continue;
 
-        auto* pColorTexGL = pRTView->GetTexture<TextureBaseGL>();
+        TextureBaseGL* pColorTexGL = pRTView->GetTexture<TextureBaseGL>();
         pColorTexGL->TextureMemoryBarrier(
             MEMORY_BARRIER_FRAMEBUFFER, // Reads and writes via framebuffer object attachments after the
                                         // barrier will reflect data written by shaders prior to the barrier.
@@ -279,7 +261,7 @@ const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32             Nu
 
     if (pDSV)
     {
-        auto* pDepthTexGL = pDSV->GetTexture<TextureBaseGL>();
+        TextureBaseGL* pDepthTexGL = pDSV->GetTexture<TextureBaseGL>();
         pDepthTexGL->TextureMemoryBarrier(MEMORY_BARRIER_FRAMEBUFFER, ContextState);
         Key.DSId    = pDepthTexGL->GetUniqueID();
         Key.DSVDesc = pDSV->GetDesc();
@@ -293,7 +275,7 @@ const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32             Nu
     if (fbo_it == m_Cache.end())
     {
         // Create a new FBO
-        auto NewFBO = CreateFBO(ContextState, NumRenderTargets, ppRTVs, pDSV);
+        GLObjectWrappers::GLFrameBufferObj NewFBO = CreateFBO(ContextState, NumRenderTargets, ppRTVs, pDSV);
 
         auto it_inserted = m_Cache.emplace(Key, std::move(NewFBO));
         // New FBO must be actually inserted
@@ -325,7 +307,7 @@ const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32 Width, Uint32 
     if (fbo_it == m_Cache.end())
     {
         // Create a new FBO
-        auto NewFBO = CreateFBO(ContextState, 0, nullptr, nullptr, Width, Height);
+        GLObjectWrappers::GLFrameBufferObj NewFBO = CreateFBO(ContextState, 0, nullptr, nullptr, Width, Height);
 
         auto it_inserted = m_Cache.emplace(Key, std::move(NewFBO));
         // New FBO must be actually inserted
@@ -337,7 +319,7 @@ const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(Uint32 Width, Uint32 
 
 inline GLenum GetFramebufferAttachmentPoint(TEXTURE_FORMAT Format)
 {
-    const auto& FmtAttribs = GetTextureFormatAttribs(Format);
+    const TextureFormatAttribs& FmtAttribs = GetTextureFormatAttribs(Format);
     switch (FmtAttribs.ComponentType)
     {
         case COMPONENT_TYPE_DEPTH:
@@ -354,13 +336,13 @@ const GLObjectWrappers::GLFrameBufferObj& FBOCache::GetFBO(TextureBaseGL*       
                                                            Uint32                                  MipLevel,
                                                            TextureBaseGL::FRAMEBUFFER_TARGET_FLAGS Targets)
 {
-    const auto& TexDesc = pTex->GetDesc();
+    const TextureDesc& TexDesc = pTex->GetDesc();
 
     FBOCacheKey Key;
     Key.NumRenderTargets = 1;
     Key.RTIds[0]         = pTex->GetUniqueID();
 
-    auto& RTV0{Key.RTVDescs[0]};
+    TextureViewDesc& RTV0{Key.RTVDescs[0]};
     RTV0.Format     = TexDesc.Format;
     RTV0.TextureDim = TexDesc.Type;
     RTV0.ViewType   = (Targets & TextureBaseGL::FRAMEBUFFER_TARGET_FLAG_DRAW) ?

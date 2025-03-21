@@ -26,12 +26,15 @@
 
 #include "ThreadPool.hpp"
 
+#include <algorithm>
 #include <mutex>
 #include <thread>
 #include <map>
 #include <vector>
 #include <condition_variable>
 #include <cfloat>
+
+#include "PlatformMisc.hpp"
 
 namespace Diligent
 {
@@ -124,13 +127,18 @@ public:
                 }
             }
 
+            bool TaskFinished = false;
             if (PrerequisitesMet)
             {
                 TaskInfo.pTask->SetStatus(ASYNC_TASK_STATUS_RUNNING);
-                TaskInfo.pTask->Run(ThreadId);
-                DEV_CHECK_ERR((TaskInfo.pTask->GetStatus() == ASYNC_TASK_STATUS_COMPLETE ||
-                               TaskInfo.pTask->GetStatus() == ASYNC_TASK_STATUS_CANCELLED),
-                              "Finished tasks must be in COMPLETE or CANCELLED state");
+                ASYNC_TASK_STATUS ReturnStatus = TaskInfo.pTask->Run(ThreadId);
+                // NB: It is essential to set the task status after the Run() method returns.
+                //     This way if the GetStatus() method returns any value other than ASYNC_TASK_STATUS_RUNNING,
+                //     it is guaranteed that the task is not executed by any thread.
+                TaskInfo.pTask->SetStatus(ReturnStatus);
+                TaskFinished = TaskInfo.pTask->IsFinished();
+                DEV_CHECK_ERR((TaskFinished || TaskInfo.pTask->GetStatus() == ASYNC_TASK_STATUS_NOT_STARTED),
+                              "Finished tasks must be in COMPLETE, CANCELLED or NOT_STARTED state");
             }
 
             {
@@ -138,7 +146,7 @@ public:
 
                 const auto NumRunningTasks = m_NumRunningTasks.fetch_add(-1) - 1;
 
-                if (PrerequisitesMet)
+                if (TaskFinished)
                 {
                     if (m_TasksQueue.empty() && NumRunningTasks == 0)
                     {
@@ -147,14 +155,15 @@ public:
                 }
                 else
                 {
-                    // If prerequisites are not met, re-enqueue the task with the minimum prerequisite priority
+                    // If prerequisites are not met or the task requested to be re-run,
+                    // re-enqueue the task with the minimum prerequisite priority
                     if (TaskInfo.pTask->GetPriority() > MinPrereqPriority)
                         TaskInfo.pTask->SetPriority(MinPrereqPriority);
                     m_TasksQueue.emplace(TaskInfo.pTask->GetPriority(), std::move(TaskInfo));
                 }
             }
 
-            if (!PrerequisitesMet)
+            if (!TaskFinished)
             {
                 m_NextTaskCond.notify_one();
             }
@@ -341,6 +350,49 @@ private:
 RefCntAutoPtr<IThreadPool> CreateThreadPool(const ThreadPoolCreateInfo& ThreadPoolCI)
 {
     return RefCntAutoPtr<ThreadPoolImpl>{MakeNewRCObj<ThreadPoolImpl>()(ThreadPoolCI)};
+}
+
+Uint64 PinWorkerThread(Uint32 ThreadId, Uint64 AllowedCoresMask)
+{
+    if (AllowedCoresMask == 0)
+    {
+        return 0;
+    }
+
+    Uint64 NumCores = std::thread::hardware_concurrency();
+    if (NumCores <= 1)
+        return 0;
+
+    Uint64 AffinityMask = AllowedCoresMask;
+    if (NumCores < 64)
+        AffinityMask &= (Uint64{1} << NumCores) - Uint64{1};
+
+    if (AffinityMask == 0)
+    {
+        LOG_WARNING_MESSAGE("Allowed cores mask (0x", std::hex, AllowedCoresMask, ") does not set any bits corresponding to ", std::dec, NumCores, " available cores");
+        return 0;
+    }
+
+    const Uint32 NumAllowedCores = PlatformMisc::CountOneBits(AffinityMask);
+    const Uint32 CoreBitInd      = ThreadId % NumAllowedCores;
+
+    for (Uint32 bit = 0; bit < CoreBitInd; ++bit)
+    {
+        VERIFY_EXPR(AffinityMask != 0);
+        Uint64 LSB = PlatformMisc::GetLSB(AffinityMask);
+        AffinityMask &= ~(Uint64{1} << LSB);
+    }
+
+    VERIFY_EXPR(AffinityMask != 0);
+    Uint32 WorkerCore = PlatformMisc::GetLSB(AffinityMask);
+    VERIFY_EXPR(WorkerCore < NumCores);
+    Uint64 PrevMask = PlatformMisc::SetCurrentThreadAffinity(Uint64{1} << WorkerCore) != 0;
+    if (PrevMask == 0)
+    {
+        LOG_WARNING_MESSAGE("Failed to pin worker thread ", ThreadId, " to core ", WorkerCore);
+    }
+
+    return PrevMask;
 }
 
 } // namespace Diligent

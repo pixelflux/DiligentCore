@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,15 +27,28 @@
 
 #include "pch.h"
 #include "DataBlobImpl.hpp"
+#include "DefaultRawMemoryAllocator.hpp"
 
 #include <cstring>
 
 namespace Diligent
 {
 
+RefCntAutoPtr<DataBlobImpl> DataBlobImpl::Create(IMemoryAllocator* pAllocator, size_t InitialSize, const void* pData)
+{
+    if (pAllocator == nullptr)
+        pAllocator = &DefaultRawMemoryAllocator::GetAllocator();
+    return RefCntAutoPtr<DataBlobImpl>{MakeNewRCObj<DataBlobImpl>()(*pAllocator, InitialSize, pData)};
+}
+
 RefCntAutoPtr<DataBlobImpl> DataBlobImpl::Create(size_t InitialSize, const void* pData)
 {
-    return RefCntAutoPtr<DataBlobImpl>{MakeNewRCObj<DataBlobImpl>()(InitialSize, pData)};
+    return Create(nullptr, InitialSize, pData);
+}
+
+RefCntAutoPtr<DataBlobImpl> DataBlobImpl::Create(DataBufferType&& DataBuff) noexcept
+{
+    return RefCntAutoPtr<DataBlobImpl>{MakeNewRCObj<DataBlobImpl>()(std::move(DataBuff))};
 }
 
 RefCntAutoPtr<DataBlobImpl> DataBlobImpl::MakeCopy(const IDataBlob* pDataBlob)
@@ -46,14 +59,24 @@ RefCntAutoPtr<DataBlobImpl> DataBlobImpl::MakeCopy(const IDataBlob* pDataBlob)
     return Create(pDataBlob->GetSize(), pDataBlob->GetConstDataPtr());
 }
 
-DataBlobImpl::DataBlobImpl(IReferenceCounters* pRefCounters, size_t InitialSize, const void* pData) :
+DataBlobImpl::DataBlobImpl(IReferenceCounters* pRefCounters,
+                           IMemoryAllocator&   Allocator,
+                           size_t              InitialSize,
+                           const void*         pData) :
     TBase{pRefCounters},
-    m_DataBuff(InitialSize)
+    m_DataBuff{InitialSize, Uint8{}, STD_ALLOCATOR_RAW_MEM(Uint8, Allocator, "Allocator for vector<Uint8>")}
 {
     if (!m_DataBuff.empty() && pData != nullptr)
     {
         std::memcpy(m_DataBuff.data(), pData, InitialSize);
     }
+}
+
+DataBlobImpl::DataBlobImpl(IReferenceCounters* pRefCounters,
+                           DataBufferType&&    DataBuff) noexcept :
+    TBase{pRefCounters},
+    m_DataBuff{std::move(DataBuff)}
+{
 }
 
 DataBlobImpl::~DataBlobImpl()
@@ -72,15 +95,15 @@ size_t DataBlobImpl::GetSize() const
 }
 
 /// Returns the pointer to the internal data buffer
-void* DataBlobImpl::GetDataPtr()
+void* DataBlobImpl::GetDataPtr(size_t Offset)
 {
-    return m_DataBuff.data();
+    return &m_DataBuff[Offset];
 }
 
 /// Returns const pointer to the internal data buffer
-const void* DataBlobImpl::GetConstDataPtr() const
+const void* DataBlobImpl::GetConstDataPtr(size_t Offset) const
 {
-    return m_DataBuff.data();
+    return &m_DataBuff[Offset];
 }
 
 IMPLEMENT_QUERY_INTERFACE(DataBlobImpl, IID_DataBlob, TBase)
@@ -98,6 +121,17 @@ void DataBlobAllocatorAdapter::Free(void* Ptr)
     VERIFY(m_pDataBlob, "Memory has not been allocated");
     VERIFY(m_pDataBlob->GetDataPtr() == Ptr, "Incorrect memory pointer");
     m_pDataBlob.Release();
+}
+
+void* DataBlobAllocatorAdapter::AllocateAligned(size_t Size, size_t Alignment, const Char* dbgDescription, const char* dbgFileName, const Int32 dbgLineNumber)
+{
+    VERIFY(Alignment <= sizeof(void*), "Alignment (", Alignment, ") exceeds the default alignment (", sizeof(void*), ")");
+    return Allocate(Size, dbgDescription, dbgFileName, dbgLineNumber);
+}
+
+void DataBlobAllocatorAdapter::FreeAligned(void* Ptr)
+{
+    Free(Ptr);
 }
 
 } // namespace Diligent

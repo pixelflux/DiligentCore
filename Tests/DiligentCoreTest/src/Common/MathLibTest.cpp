@@ -1074,37 +1074,66 @@ TEST(Common_BasicMath, OrthoProjection)
     {
         float4x4 OrthoProj = float4x4::Ortho(2.f, 4.f, -4.f, 12.f, false);
 
-        auto c0 = float3{-1.f, -2.f, -4.f} * OrthoProj;
-        auto c1 = float3{+1.f, +2.f, +12.f} * OrthoProj;
+        float3 c0 = float3{-1.f, -2.f, -4.f} * OrthoProj;
+        float3 c1 = float3{+1.f, +2.f, +12.f} * OrthoProj;
         EXPECT_EQ(c0, float3(-1, -1, 0));
         EXPECT_EQ(c1, float3(+1, +1, +1));
+
+        float Near = 0, Far = 0;
+        OrthoProj.GetNearFarClipPlanes(Near, Far, false);
+        EXPECT_FLOAT_EQ(Near, -4);
+        EXPECT_FLOAT_EQ(Far, 12);
+
+        OrthoProj.SetNearFarClipPlanes(2, 34, false);
+        OrthoProj.GetNearFarClipPlanes(Near, Far, false);
+        EXPECT_FLOAT_EQ(Near, 2);
+        EXPECT_FLOAT_EQ(Far, 34);
     }
 
     {
         float4x4 OrthoProj = float4x4::Ortho(2.f, 4.f, -4.f, 12.f, true);
 
-        auto c0 = float3(-1.f, -2.f, -4.f) * OrthoProj;
-        auto c1 = float3(+1.f, +2.f, +12.f) * OrthoProj;
+        float3 c0 = float3(-1.f, -2.f, -4.f) * OrthoProj;
+        float3 c1 = float3(+1.f, +2.f, +12.f) * OrthoProj;
         EXPECT_EQ(c0, float3(-1, -1, -1));
         EXPECT_EQ(c1, float3(+1, +1, +1));
+
+        float Near = 0, Far = 0;
+        OrthoProj.GetNearFarClipPlanes(Near, Far, true);
+        EXPECT_FLOAT_EQ(Near, -4);
+        EXPECT_FLOAT_EQ(Far, 12);
+
+        OrthoProj.SetNearFarClipPlanes(2, 34, true);
+        OrthoProj.GetNearFarClipPlanes(Near, Far, true);
+        EXPECT_FLOAT_EQ(Near, 2);
+        EXPECT_FLOAT_EQ(Far, 34);
     }
 
     {
         float4x4 OrthoProj = float4x4::OrthoOffCenter(-2.f, 6.f, -4.f, +12.f, -6.f, 10.f, false);
 
-        auto c0 = float3{-2.f, -4.f, -6.f} * OrthoProj;
-        auto c1 = float3{+6.f, +12.f, +10.f} * OrthoProj;
+        float3 c0 = float3{-2.f, -4.f, -6.f} * OrthoProj;
+        float3 c1 = float3{+6.f, +12.f, +10.f} * OrthoProj;
         EXPECT_EQ(c0, float3(-1, -1, 0));
         EXPECT_EQ(c1, float3(+1, +1, +1));
+
+        float Near = 0, Far = 0;
+        OrthoProj.GetNearFarClipPlanes(Near, Far, false);
+        EXPECT_FLOAT_EQ(Near, -6);
+        EXPECT_FLOAT_EQ(Far, 10);
     }
 
     {
         float4x4 OrthoProj = float4x4::OrthoOffCenter(-2.f, 6.f, -4.f, +12.f, -6.f, 10.f, true);
 
-        auto c0 = float3{-2.f, -4.f, -6.f} * OrthoProj;
-        auto c1 = float3{+6.f, +12.f, +10.f} * OrthoProj;
+        float3 c0 = float3{-2.f, -4.f, -6.f} * OrthoProj;
+        float3 c1 = float3{+6.f, +12.f, +10.f} * OrthoProj;
         EXPECT_EQ(c0, float3(-1, -1, -1));
         EXPECT_EQ(c1, float3(+1, +1, +1));
+
+        float Near = 0, Far = 0;
+        OrthoProj.GetNearFarClipPlanes(Near, Far, true);
+        EXPECT_FLOAT_EQ(Near, -6);
     }
 }
 
@@ -2938,6 +2967,8 @@ TEST(Common_AdvancedMath, GetPointToOrientedBoxDistance)
 
 TEST(Common_AdvancedMath, TriangulatePolygon2D)
 {
+    Polygon2DTriangulator<Uint32> Triangulator;
+
     {
         const std::vector<int2> Verts = {
             {0, 0},
@@ -2945,7 +2976,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
             {0, 1}};
         const std::vector<Uint32> RefTris = {0, 1, 2};
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -2969,7 +3001,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
 
         const std::vector<Uint32> RefTris = {3, 0, 1, 1, 2, 3};
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -2992,7 +3025,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
         }
         const std::vector<Uint32> RefTris = {3, 0, 1, 1, 2, 3};
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -3062,7 +3096,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
             case 3: RefTris = {3, 0, 1, 1, 2, 3}; break;
         }
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -3098,7 +3133,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
             case 3: RefTris = {3, 0, 1, 1, 2, 3}; break;
         }
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -3125,7 +3161,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
 
         const std::vector<Uint32> RefTris = {3, 0, 1, 1, 2, 3};
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -3152,7 +3189,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
 
         const std::vector<Uint32> RefTris = {3, 0, 1, 1, 2, 3};
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -3235,7 +3273,8 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
             case 5: RefTris = {5, 0, 1, 1, 2, 3, 1, 3, 4, 1, 4, 5}; break;
         }
 
-        const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 
@@ -3253,7 +3292,9 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
             {170.33697864625216, -214.39292757663975},
             {165.87260207492534, -216.35619205753781},
         };
-        const auto Tris = TriangulatePolygon<Uint32>(Verts, false);
+
+        const auto Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult() & ~TRIANGULATE_POLYGON_RESULT_INVALID_EAR, TRIANGULATE_POLYGON_RESULT_OK);
 
         const std::vector<Uint32> RefTris = {1, 2, 3, 1, 3, 4, 0, 1, 4, 0, 4, 5, 10, 0, 5, 5, 6, 7, 5, 7, 8, 5, 8, 9, 5, 9, 10};
         EXPECT_EQ(Tris, RefTris);
@@ -3296,7 +3337,27 @@ TEST(Common_AdvancedMath, TriangulatePolygon3D)
 
         const std::vector<Uint32> RefTris = {0, 1, 2, 0, 2, 3, 5, 0, 3, 3, 4, 5};
 
-        const auto Tris = TriangulatePolygon3D<Uint32>(Verts);
+        Polygon3DTriangulator<Uint32, float> Triangulator;
+        const auto                           Tris = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
+        EXPECT_EQ(Tris, RefTris);
+    }
+
+    {
+        const std::vector<double3> Verts = {
+            {0.0866542682, 0.191178054, 0.119771279},
+            {0.0846562684, 0.192071155, 0.119771279},
+            {0.0846562684, 0.192071155, 0.120928936},
+            {0.104519472, 0.182026610, 0.120928936},
+            {0.121640369, 0.171060309, 0.120928936},
+            {0.129021034, 0.165564433, 0.120928936},
+            {0.129021034, 0.165564433, 0.119771279},
+            {0.104520433, 0.182026073, 0.119771279},
+        };
+        Polygon3DTriangulator<Uint32, double> Triangulator;
+        const std::vector<Uint32>             RefTris = {0, 1, 2, 7, 0, 2, 7, 2, 3, 7, 3, 4, 7, 4, 5, 5, 6, 7};
+        const auto                            Tris    = Triangulator.Triangulate(Verts);
+        EXPECT_EQ(Triangulator.GetResult(), TRIANGULATE_POLYGON_RESULT_OK);
         EXPECT_EQ(Tris, RefTris);
     }
 }

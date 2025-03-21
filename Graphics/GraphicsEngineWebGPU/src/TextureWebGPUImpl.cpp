@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2024 Diligent Graphics LLC
+ *  Copyright 2023-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -133,10 +133,40 @@ WGPUTextureDescriptor TextureDescToWGPUTextureDescriptor(const TextureDesc&     
     wgpuTextureDesc.sampleCount     = Desc.SampleCount;
     wgpuTextureDesc.size.width      = Desc.GetWidth();
     wgpuTextureDesc.size.height     = Desc.GetHeight();
-    wgpuTextureDesc.label           = Desc.Name;
+    wgpuTextureDesc.label           = GetWGPUStringView(Desc.Name);
 
     return wgpuTextureDesc;
 }
+
+#if !PLATFORM_EMSCRIPTEN
+static WGPUTextureUsage TextureViewTypeToWGPUTextureUsage(TEXTURE_VIEW_TYPE ViewType)
+{
+    static_assert(TEXTURE_VIEW_NUM_VIEWS == 7, "Please update the switch below to handle the new view type");
+    switch (ViewType)
+    {
+        case TEXTURE_VIEW_SHADER_RESOURCE:
+            return WGPUTextureUsage_TextureBinding;
+
+        case TEXTURE_VIEW_RENDER_TARGET:
+        case TEXTURE_VIEW_DEPTH_STENCIL:
+            return WGPUTextureUsage_RenderAttachment;
+
+        case TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL:
+            return WGPUTextureUsage_TextureBinding;
+
+        case TEXTURE_VIEW_UNORDERED_ACCESS:
+            return WGPUTextureUsage_StorageBinding;
+
+        case TEXTURE_VIEW_SHADING_RATE:
+            UNEXPECTED("Shading rate texture views are not supported in WebGPU");
+            return WGPUTextureUsage_None;
+
+        default:
+            UNEXPECTED("Unexpected view type");
+            return WGPUTextureUsage_None;
+    }
+}
+#endif
 
 WGPUTextureViewDescriptor TextureViewDescToWGPUTextureViewDescriptor(const TextureDesc&            TexDesc,
                                                                      TextureViewDesc&              ViewDesc,
@@ -198,6 +228,15 @@ WGPUTextureViewDescriptor TextureViewDescToWGPUTextureViewDescriptor(const Textu
         else
             wgpuTextureViewDesc.aspect = WGPUTextureAspect_All;
     }
+
+    // TODO: enable this as soon as Emscripten adds the usage member to WGPUTextureViewDescriptor
+    // https://github.com/emscripten-core/emscripten/issues/23945
+#if !PLATFORM_EMSCRIPTEN
+    if (ViewDesc.Format != TexDesc.Format)
+    {
+        wgpuTextureViewDesc.usage = TextureViewTypeToWGPUTextureUsage(ViewDesc.ViewType);
+    }
+#endif
 
     return wgpuTextureViewDesc;
 }
@@ -312,14 +351,15 @@ TextureWebGPUImpl::TextureWebGPUImpl(IReferenceCounters*        pRefCounters,
         {
             WGPUBufferDescriptor wgpuBufferDesc{};
             wgpuBufferDesc.usage            = WGPUBufferUsage_MapWrite | WGPUBufferUsage_CopySrc;
-            wgpuBufferDesc.size             = GetStagingLocationOffset(m_Desc, m_Desc.GetArraySize(), 0);
+            wgpuBufferDesc.size             = AlignUp(GetStagingLocationOffset(m_Desc, m_Desc.GetArraySize(), 0), Uint64{4});
             wgpuBufferDesc.mappedAtCreation = true;
 
             WebGPUBufferWrapper wgpuUploadBuffer{wgpuDeviceCreateBuffer(pDevice->GetWebGPUDevice(), &wgpuBufferDesc)};
             if (!wgpuUploadBuffer)
                 LOG_ERROR_AND_THROW("Failed to create WebGPU texture upload buffer");
 
-            uint8_t* pUploadData = static_cast<uint8_t*>(wgpuBufferGetMappedRange(wgpuUploadBuffer.Get(), 0, WGPU_WHOLE_MAP_SIZE));
+            // Do NOT use WGPU_WHOLE_MAP_SIZE due to https://github.com/emscripten-core/emscripten/issues/20538
+            uint8_t* pUploadData = static_cast<uint8_t*>(wgpuBufferGetMappedRange(wgpuUploadBuffer.Get(), 0, static_cast<size_t>(wgpuBufferDesc.size)));
 
             WGPUCommandEncoderDescriptor wgpuEncoderDesc{};
             WebGPUCommandEncoderWrapper  wgpuCmdEncoder{wgpuDeviceCreateCommandEncoder(pDevice->GetWebGPUDevice(), &wgpuEncoderDesc)};

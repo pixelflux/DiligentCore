@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -697,6 +697,12 @@ inline Uint64 GetStagingTextureSubresourceOffset(const TextureDesc& TexDesc,
     return GetStagingTextureLocationOffset(TexDesc, ArraySlice, MipLevel, Alignment, 0, 0, 0);
 }
 
+/// Returns the total memory size required to store the staging texture data.
+inline Uint64 GetStagingTextureDataSize(const TextureDesc& TexDesc,
+                                        Uint32             Alignment = 4)
+{
+    return GetStagingTextureSubresourceOffset(TexDesc, TexDesc.GetArraySize(), 0, Alignment);
+}
 
 /// Information required to perform a copy operation between a buffer and a texture
 struct BufferToTextureCopyInfo
@@ -767,9 +773,33 @@ String GetShaderResourcePrintName(const DescType& ResDesc, Uint32 ArrayIndex = 0
     return GetShaderResourcePrintName(ResDesc.Name, ResDesc.ArraySize, ArrayIndex);
 }
 
+/// Converts UNORM format to a corresponding SRGB format, for example:
+///   RGBA8_UNORM -> RGBA8_UNORM_SRGB
+///   BC3_UNORM -> BC3_UNORM_SRGB
 TEXTURE_FORMAT UnormFormatToSRGB(TEXTURE_FORMAT Fmt);
 
+/// Converts SRGB format to a corresponding UNORM format, for example:
+///   RGBA8_UNORM_SRGB -> RGBA8_UNORM
+///   BC3_UNORM_SRGB -> BC3_UNORM
 TEXTURE_FORMAT SRGBFormatToUnorm(TEXTURE_FORMAT Fmt);
+
+/// Converts block-compressed format to a corresponding uncompressed format, for example:
+///   BC1_UNORM -> RGBA8_UNORM
+///   BC4_UNORM -> R8_UNORM
+TEXTURE_FORMAT BCFormatToUncompressed(TEXTURE_FORMAT Fmt);
+
+/// Converts typeless format to a corresponding UNORM format, for example:
+///   RGBA8_TYPELESS -> RGBA8_UNORM
+///   BC1_TYPELESS   -> BC1_UNORM
+/// If the format is not typeless, or cannot be converted to UNORM, it is returned as is.
+TEXTURE_FORMAT TypelessFormatToUnorm(TEXTURE_FORMAT Fmt);
+
+/// Converts typeless format to a corresponding SRGB format, for example:
+///   RGBA8_TYPELESS -> RGBA8_UNORM_SRGB
+///   BC1_TYPELESS   -> BC1_UNORM_SRGB
+/// If the format is not typeless, or cannot be converted to SRGB, it is returned as is.
+TEXTURE_FORMAT TypelessFormatToSRGB(TEXTURE_FORMAT Fmt);
+
 
 bool IsSRGBFormat(TEXTURE_FORMAT Fmt);
 
@@ -928,6 +958,62 @@ SHADER_STATUS GetPipelineStateCreateInfoShadersStatus(const CreateInfoType& CI, 
         }
     });
     return OverallStatus;
+}
+
+size_t ComputeRenderTargetFormatsHash(Uint32 NumRenderTargets, const TEXTURE_FORMAT RTVFormats[], TEXTURE_FORMAT DSVFormat);
+
+
+/// Returns the string containing the device features
+///
+/// \param Features   - device features.
+/// \param NumColumns - the number of columns in the output.
+/// \param Indent     - indentation of the first column.
+/// \param Spacing    - spacing between columns.
+/// \param Flags      - flags to control which features to include in the output.
+/// 				    If (1<<State) & Flags is true, the feature will be included.
+/// \return             string containing the device features.
+template <typename FeaturesType>
+std::string GetDeviceFeaturesString(const FeaturesType& Features,
+                                    size_t              NumColumns,
+                                    int                 Indent  = 4,
+                                    int                 Spacing = 4,
+                                    Uint32              Flags   = ~0u)
+{
+    VERIFY_EXPR(NumColumns > 0);
+
+    std::vector<std::string> FeatureStrings;
+    std::vector<size_t>      ColWidth(NumColumns);
+    FeaturesType::Enumerate(Features,
+                            [&](const char* Name, DEVICE_FEATURE_STATE State) {
+                                if ((Flags & (1u << State)) != 0u)
+                                {
+                                    std::string FeatureStateStr{Name};
+                                    FeatureStateStr += ": ";
+                                    FeatureStateStr += GetDeviceFeatureStateString(State);
+
+                                    size_t col    = FeatureStrings.size() % NumColumns;
+                                    ColWidth[col] = std::max(ColWidth[col], FeatureStateStr.length());
+
+                                    FeatureStrings.emplace_back(std::move(FeatureStateStr));
+                                }
+                                return true;
+                            });
+
+    std::stringstream ss;
+    for (size_t i = 0; i < FeatureStrings.size();)
+    {
+        for (size_t col = 0; col < NumColumns && i < FeatureStrings.size(); ++col, ++i)
+        {
+            if (col == 0 && i > 0)
+                ss << std::endl;
+            ss << std::setw(col == 0 ? Indent : Spacing) << std::left << ' ';
+            if (col + 1 < NumColumns && i + 1 < FeatureStrings.size())
+                ss << std::setw(static_cast<int>(ColWidth[col])) << std::left;
+            ss << FeatureStrings[i];
+        }
+    }
+
+    return ss.str();
 }
 
 } // namespace Diligent

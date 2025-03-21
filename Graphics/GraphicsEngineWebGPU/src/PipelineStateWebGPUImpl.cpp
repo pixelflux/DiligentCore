@@ -1,5 +1,5 @@
 /*
- *  Copyright 2024 Diligent Graphics LLC
+ *  Copyright 2024-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ void PipelineStateWebGPUImpl::RemapOrVerifyShaderResources(
 
     // Verify that pipeline layout is compatible with shader resources and
     // remap resource bindings.
-    for (auto& ShaderStage : ShaderStages)
+    for (ShaderStageInfo& ShaderStage : ShaderStages)
     {
         const ShaderWebGPUImpl* pShader     = ShaderStage.pShader;
         std::string&            PatchedWGSL = ShaderStage.PatchedWGSL;
@@ -159,7 +159,7 @@ void PipelineStateWebGPUImpl::RemapOrVerifyShaderResources(
                     ValidatePipelineResourceCompatibility(ResDesc, ResType, Flags, WGSLAttribs.ArraySize,
                                                           pShader->GetDesc().Name, SignDesc.Name);
 
-                    const auto& ResAttribs{ResAttribution.pSignature->GetResourceAttribs(ResAttribution.ResourceIndex)};
+                    const PipelineResourceAttribsWebGPU& ResAttribs{ResAttribution.pSignature->GetResourceAttribs(ResAttribution.ResourceIndex)};
                     ResourceBinding = ResAttribs.BindingIndex;
                     BindGroup       = ResAttribs.BindGroup;
                     ArraySize       = ResAttribs.ArraySize;
@@ -223,7 +223,7 @@ void PipelineStateWebGPUImpl::InitPipelineLayout(const PipelineStateCreateInfo& 
     const PSO_CREATE_INTERNAL_FLAGS InternalFlags = GetInternalCreateFlags(CreateInfo);
     if (m_UsingImplicitSignature && (InternalFlags & PSO_CREATE_INTERNAL_FLAG_IMPLICIT_SIGNATURE0) == 0)
     {
-        const auto SignDesc = GetDefaultResourceSignatureDesc(ShaderStages, m_Desc.Name, m_Desc.ResourceLayout, m_Desc.SRBAllocationGranularity);
+        const PipelineResourceSignatureDescWrapper SignDesc = GetDefaultResourceSignatureDesc(ShaderStages, m_Desc.Name, m_Desc.ResourceLayout, m_Desc.SRBAllocationGranularity);
         InitDefaultSignature(SignDesc, GetActiveShaderStages(), false /*bIsDeviceInternal*/);
         VERIFY_EXPR(m_Signatures[0]);
     }
@@ -279,7 +279,7 @@ struct PipelineStateWebGPUImpl::AsyncPipelineBuilder : public ObjectBase<IObject
         ShaderStages{std::move(_ShaderStages)}
     {
         ShaderRefs.reserve(ShaderStages.size());
-        for (const auto& ShaderStage : ShaderStages)
+        for (const ShaderStageInfo& ShaderStage : ShaderStages)
         {
             ShaderRefs.emplace_back(ShaderStage.pShader);
         }
@@ -288,7 +288,7 @@ struct PipelineStateWebGPUImpl::AsyncPipelineBuilder : public ObjectBase<IObject
     void InitializePipelines(WGPUCreatePipelineAsyncStatus PipelineStatus,
                              WGPURenderPipeline            RenderPipeline,
                              WGPUComputePipeline           ComputePipeline,
-                             const char*                   Message)
+                             WGPUStringView                Message)
     {
         VERIFY_EXPR(Status.load() == CallbackStatus::InProgress);
         if (PipelineStatus == WGPUCreatePipelineAsyncStatus_Success)
@@ -298,28 +298,42 @@ struct PipelineStateWebGPUImpl::AsyncPipelineBuilder : public ObjectBase<IObject
         }
         else
         {
-            LOG_ERROR_MESSAGE("Failed to create WebGPU render pipeline: ", Message);
+            LOG_ERROR_MESSAGE("Failed to create WebGPU render pipeline: ", WGPUStringViewToString(Message));
         }
         Status.store(CallbackStatus::Completed);
         Release();
     }
 
-    static void CreateRenderPipelineCallback(WGPUCreatePipelineAsyncStatus Status, WGPURenderPipeline Pipeline, const char* Message, void* pUserData)
+    static void CreateRenderPipelineCallback(WGPUCreatePipelineAsyncStatus Status,
+                                             WGPURenderPipeline            Pipeline,
+                                             WGPUStringView                Message,
+                                             void*                         pUserData)
     {
         static_cast<AsyncPipelineBuilder*>(pUserData)->InitializePipelines(Status, Pipeline, nullptr, Message);
     }
 
-    static void CreateRenderPipelineCallback2(WGPUCreatePipelineAsyncStatus Status, WGPURenderPipeline Pipeline, const char* Message, void* pUserData1, void* pUserData2)
+    static void CreateRenderPipelineCallback2(WGPUCreatePipelineAsyncStatus Status,
+                                              WGPURenderPipeline            Pipeline,
+                                              WGPUStringView                Message,
+                                              void*                         pUserData1,
+                                              void*                         pUserData2)
     {
         CreateRenderPipelineCallback(Status, Pipeline, Message, pUserData1);
     }
 
-    static void CreateComputePipelineCallback(WGPUCreatePipelineAsyncStatus Status, WGPUComputePipeline Pipeline, const char* Message, void* pUserData)
+    static void CreateComputePipelineCallback(WGPUCreatePipelineAsyncStatus Status,
+                                              WGPUComputePipeline           Pipeline,
+                                              WGPUStringView                Message,
+                                              void*                         pUserData)
     {
         static_cast<AsyncPipelineBuilder*>(pUserData)->InitializePipelines(Status, nullptr, Pipeline, Message);
     }
 
-    static void CreateComputePipelineCallback2(WGPUCreatePipelineAsyncStatus Status, WGPUComputePipeline Pipeline, const char* Message, void* pUserData1, void* pUserData2)
+    static void CreateComputePipelineCallback2(WGPUCreatePipelineAsyncStatus Status,
+                                               WGPUComputePipeline           Pipeline,
+                                               WGPUStringView                Message,
+                                               void*                         pUserData1,
+                                               void*                         pUserData2)
     {
         CreateComputePipelineCallback(Status, Pipeline, Message, pUserData1);
     }
@@ -364,7 +378,7 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
     const GraphicsPipelineDesc& GraphicsPipeline = m_pGraphicsPipelineData->Desc;
 
     WGPURenderPipelineDescriptor wgpuRenderPipelineDesc{};
-    wgpuRenderPipelineDesc.label  = m_Desc.Name;
+    wgpuRenderPipelineDesc.label  = GetWGPUStringView(m_Desc.Name);
     wgpuRenderPipelineDesc.layout = m_PipelineLayout.GetWebGPUPipelineLayout();
 
     WGPUFragmentState wgpuFragmentState{};
@@ -374,13 +388,13 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
     {
         const ShaderStageInfo& Stage = ShaderStages[ShaderIdx];
 
-        WGPUShaderModuleWGSLDescriptor wgpuShaderCodeDesc{};
-        wgpuShaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-        wgpuShaderCodeDesc.code        = Stage.GetWGSL().c_str();
+        WGPUShaderSourceWGSL wgpuShaderCodeDesc{};
+        wgpuShaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
+        wgpuShaderCodeDesc.code        = GetWGPUStringView(Stage.GetWGSL());
 
         WGPUShaderModuleDescriptor wgpuShaderModuleDesc{};
         wgpuShaderModuleDesc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgpuShaderCodeDesc);
-        wgpuShaderModuleDesc.label       = Stage.pShader->GetDesc().Name;
+        wgpuShaderModuleDesc.label       = GetWGPUStringView(Stage.pShader->GetDesc().Name);
         wgpuShaderModules[ShaderIdx].Reset(wgpuDeviceCreateShaderModule(m_pDevice->GetWebGPUDevice(), &wgpuShaderModuleDesc));
         VERIFY(wgpuShaderModules[ShaderIdx], "Failed to create WGPU shader module for shader '", Stage.pShader->GetDesc().Name, "'.");
 
@@ -389,13 +403,13 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
             case SHADER_TYPE_VERTEX:
                 VERIFY(wgpuRenderPipelineDesc.vertex.module == nullptr, "Only one vertex shader is allowed");
                 wgpuRenderPipelineDesc.vertex.module     = wgpuShaderModules[ShaderIdx].Get();
-                wgpuRenderPipelineDesc.vertex.entryPoint = Stage.pShader->GetEntryPoint();
+                wgpuRenderPipelineDesc.vertex.entryPoint = GetWGPUStringView(Stage.pShader->GetEntryPoint());
                 break;
 
             case SHADER_TYPE_PIXEL:
                 VERIFY(wgpuFragmentState.module == nullptr, "Only one vertex shader is allowed");
                 wgpuFragmentState.module        = wgpuShaderModules[ShaderIdx].Get();
-                wgpuFragmentState.entryPoint    = Stage.pShader->GetEntryPoint();
+                wgpuFragmentState.entryPoint    = GetWGPUStringView(Stage.pShader->GetEntryPoint());
                 wgpuRenderPipelineDesc.fragment = &wgpuFragmentState;
                 break;
 
@@ -443,7 +457,8 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
     std::vector<WGPUColorTargetState> wgpuColorTargetStates(GraphicsPipeline.NumRenderTargets);
     std::vector<WGPUBlendState>       wgpuBlendStates(GraphicsPipeline.NumRenderTargets);
     {
-        const BlendStateDesc& BlendDesc = GraphicsPipeline.BlendDesc;
+        const BlendStateDesc&        BlendDesc = GraphicsPipeline.BlendDesc;
+        const RenderTargetBlendDesc& RT0       = BlendDesc.RenderTargets[0];
         for (Uint32 RTIndex = 0; RTIndex < GraphicsPipeline.NumRenderTargets; ++RTIndex)
         {
             const RenderTargetBlendDesc& RT = BlendDesc.RenderTargets[RTIndex];
@@ -453,10 +468,10 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
             wgpuColorTargetState.format    = TextureFormatToWGPUFormat(GraphicsPipeline.RTVFormats[RTIndex]);
             wgpuColorTargetState.writeMask = ColorMaskToWGPUColorWriteMask(RT.RenderTargetWriteMask);
 
-            const bool RTBlendEnable = (BlendDesc.RenderTargets[0].BlendEnable && !BlendDesc.IndependentBlendEnable) || (RT.BlendEnable && BlendDesc.IndependentBlendEnable);
+            const bool RTBlendEnable = (RT0.BlendEnable && !BlendDesc.IndependentBlendEnable) || (RT.BlendEnable && BlendDesc.IndependentBlendEnable);
             if (RTBlendEnable)
             {
-                const RenderTargetBlendDesc& BlendRT = BlendDesc.IndependentBlendEnable ? RT : BlendDesc.RenderTargets[0];
+                const RenderTargetBlendDesc& BlendRT = BlendDesc.IndependentBlendEnable ? RT : RT0;
 
                 WGPUBlendState& wgpuBlendState = wgpuBlendStates[RTIndex];
 
@@ -483,7 +498,7 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
 
         wgpuDepthStencilState.format            = TextureFormatToWGPUFormat(GraphicsPipeline.DSVFormat);
         wgpuDepthStencilState.depthCompare      = DepthStencilDesc.DepthEnable ? ComparisonFuncToWGPUCompareFunction(DepthStencilDesc.DepthFunc) : WGPUCompareFunction_Always;
-        wgpuDepthStencilState.depthWriteEnabled = DepthStencilDesc.DepthEnable ? DepthStencilDesc.DepthWriteEnable : false;
+        wgpuDepthStencilState.depthWriteEnabled = DepthStencilDesc.DepthEnable ? BoolToWGPUOptionalBool(DepthStencilDesc.DepthWriteEnable) : WGPUOptionalBool_False;
 
         wgpuDepthStencilState.stencilBack.compare     = ComparisonFuncToWGPUCompareFunction(DepthStencilDesc.BackFace.StencilFunc);
         wgpuDepthStencilState.stencilBack.failOp      = StencilOpToWGPUStencilOperation(DepthStencilDesc.BackFace.StencilFailOp);
@@ -505,7 +520,9 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
         wgpuRenderPipelineDesc.depthStencil = &wgpuDepthStencilState;
     }
 
+#if PLATFORM_WEB
     WGPUPrimitiveDepthClipControl wgpuDepthClipControl{};
+#endif
     {
         const RasterizerStateDesc& RasterizerDesc = GraphicsPipeline.RasterizerDesc;
 
@@ -525,12 +542,20 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
 
         if (!GraphicsPipeline.RasterizerDesc.DepthClipEnable)
         {
-            wgpuDepthClipControl.chain.sType    = WGPUSType_PrimitiveDepthClipControl;
-            wgpuDepthClipControl.unclippedDepth = !GraphicsPipeline.RasterizerDesc.DepthClipEnable;
             if (m_pDevice->GetDeviceInfo().Features.DepthClamp)
-                wgpuPrimitiveState.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgpuDepthClipControl);
+            {
+#if PLATFORM_WEB
+                wgpuDepthClipControl.chain.sType    = WGPUSType_PrimitiveDepthClipControl;
+                wgpuDepthClipControl.unclippedDepth = true;
+                wgpuPrimitiveState.nextInChain      = reinterpret_cast<WGPUChainedStruct*>(&wgpuDepthClipControl);
+#else
+                wgpuPrimitiveState.unclippedDepth = true;
+#endif
+            }
             else
+            {
                 LOG_WARNING_MESSAGE("Depth clamping is not supported by the device. The depth clip control will be ignored.");
+            }
         }
     }
 
@@ -546,7 +571,7 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
     {
         // The reference will be released from the callback.
         AsyncBuilder->AddRef();
-#if PLATFORM_EMSCRIPTEN
+#if PLATFORM_WEB
         wgpuDeviceCreateRenderPipelineAsync(m_pDevice->GetWebGPUDevice(), &wgpuRenderPipelineDesc, AsyncPipelineBuilder::CreateRenderPipelineCallback, AsyncBuilder);
 #else
         wgpuDeviceCreateRenderPipelineAsync2(m_pDevice->GetWebGPUDevice(), &wgpuRenderPipelineDesc,
@@ -575,26 +600,26 @@ void PipelineStateWebGPUImpl::InitializeWebGPUComputePipeline(const TShaderStage
 
     WebGPUShaderModuleWrapper wgpuShaderModule{};
 
-    WGPUShaderModuleWGSLDescriptor wgpuShaderCodeDesc{};
-    wgpuShaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-    wgpuShaderCodeDesc.code        = ShaderStages[0].GetWGSL().c_str();
+    WGPUShaderSourceWGSL wgpuShaderCodeDesc{};
+    wgpuShaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
+    wgpuShaderCodeDesc.code        = GetWGPUStringView(ShaderStages[0].GetWGSL());
 
     WGPUShaderModuleDescriptor wgpuShaderModuleDesc{};
     wgpuShaderModuleDesc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgpuShaderCodeDesc);
-    wgpuShaderModuleDesc.label       = pShaderWebGPU->GetDesc().Name;
+    wgpuShaderModuleDesc.label       = GetWGPUStringView(pShaderWebGPU->GetDesc().Name);
     wgpuShaderModule.Reset(wgpuDeviceCreateShaderModule(m_pDevice->GetWebGPUDevice(), &wgpuShaderModuleDesc));
 
     WGPUComputePipelineDescriptor wgpuComputePipelineDesc{};
-    wgpuComputePipelineDesc.label              = m_Desc.Name;
+    wgpuComputePipelineDesc.label              = GetWGPUStringView(m_Desc.Name);
     wgpuComputePipelineDesc.compute.module     = wgpuShaderModule.Get();
-    wgpuComputePipelineDesc.compute.entryPoint = pShaderWebGPU->GetEntryPoint();
+    wgpuComputePipelineDesc.compute.entryPoint = GetWGPUStringView(pShaderWebGPU->GetEntryPoint());
     wgpuComputePipelineDesc.layout             = m_PipelineLayout.GetWebGPUPipelineLayout();
 
     if (AsyncBuilder)
     {
         // The reference will be released from the callback.
         AsyncBuilder->AddRef();
-#if PLATFORM_EMSCRIPTEN
+#if PLATFORM_WEB
         wgpuDeviceCreateComputePipelineAsync(m_pDevice->GetWebGPUDevice(), &wgpuComputePipelineDesc, AsyncPipelineBuilder::CreateComputePipelineCallback, AsyncBuilder);
 #else
         wgpuDeviceCreateComputePipelineAsync2(m_pDevice->GetWebGPUDevice(), &wgpuComputePipelineDesc,
@@ -629,7 +654,7 @@ PIPELINE_STATE_STATUS PipelineStateWebGPUImpl::GetStatus(bool WaitForCompletion)
 
     if (m_AsyncBuilder)
     {
-#if PLATFORM_EMSCRIPTEN
+#if PLATFORM_WEB
         if (WaitForCompletion)
         {
             LOG_ERROR_MESSAGE("Waiting for asynchronous pipeline initialization is not supported on the Web");

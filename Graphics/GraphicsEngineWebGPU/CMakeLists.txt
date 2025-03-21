@@ -134,8 +134,8 @@ else()
     list(APPEND PRIVATE_DEPENDENCIES SPIRV-Tools-opt)
 endif()
 
-if (NOT PLATFORM_EMSCRIPTEN)
-    list(APPEND PRIVATE_DEPENDENCIES webgpu_dawn)
+if (NOT PLATFORM_WEB)
+    list(APPEND PRIVATE_DEPENDENCIES dawn_native dawn_proc)
 endif()
 
 target_link_libraries(Diligent-GraphicsEngineWebGPU-static
@@ -165,18 +165,8 @@ else()
     )
 endif()
 
-set_common_target_properties(Diligent-GraphicsEngineWebGPU-shared)
-set_common_target_properties(Diligent-GraphicsEngineWebGPU-static)
-
-set_target_properties(Diligent-GraphicsEngineWebGPU-shared PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-)
-
-set_target_properties(Diligent-GraphicsEngineWebGPU-static PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-)
+set_common_target_properties(Diligent-GraphicsEngineWebGPU-shared 17)
+set_common_target_properties(Diligent-GraphicsEngineWebGPU-static 17)
 
 if (${DILIGENT_NO_GLSLANG})
     message("GLSLang is not being built. WebGPU backend will only be able to consume SPIRV byte code.")
@@ -188,7 +178,7 @@ PRIVATE
     DILIGENT_NO_HLSL=$<BOOL:${DILIGENT_NO_HLSL}>
 )
 
-if (PLATFORM_EMSCRIPTEN)
+if (PLATFORM_WEB)
     target_link_options(Diligent-GraphicsEngineWebGPU-static PUBLIC "SHELL: -s USE_WEBGPU=1 -s USE_PTHREADS=1")
 endif()
 

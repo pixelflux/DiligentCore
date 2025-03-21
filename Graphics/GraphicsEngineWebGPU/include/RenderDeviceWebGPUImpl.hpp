@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2024 Diligent Graphics LLC
+ *  Copyright 2023-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@
 /// \file
 /// Declaration of Diligent::RenderDeviceWebGPUImpl class
 
+#include <memory>
+
 #include "EngineWebGPUImplTraits.hpp"
 #include "RenderDeviceBase.hpp"
 #include "RenderDeviceWebGPU.h"
@@ -41,11 +43,8 @@
 namespace Diligent
 {
 
-using QueryManagerWebGPUPtr         = std::unique_ptr<class QueryManagerWebGPU>;
-using AttachmentCleanerWebGPUPtr    = std::unique_ptr<class AttachmentCleanerWebGPU>;
-using UploadMemoryManagerWebGPUPtr  = std::unique_ptr<class UploadMemoryManagerWebGPU>;
-using DynamicMemoryManagerWebGPUPtr = std::unique_ptr<class DynamicMemoryManagerWebGPU>;
-using GenerateMipsHelperWebGPUPtr   = std::unique_ptr<class GenerateMipsHelperWebGPU>;
+class QueryManagerWebGPU;
+class AttachmentCleanerWebGPU;
 
 /// Render device implementation in WebGPU backend.
 class RenderDeviceWebGPUImpl final : public RenderDeviceBase<EngineWebGPUImplTraits>
@@ -53,14 +52,18 @@ class RenderDeviceWebGPUImpl final : public RenderDeviceBase<EngineWebGPUImplTra
 public:
     using TRenderDeviceBase = RenderDeviceBase<EngineWebGPUImplTraits>;
 
-    RenderDeviceWebGPUImpl(IReferenceCounters*           pRefCounters,
-                           IMemoryAllocator&             RawMemAllocator,
-                           IEngineFactory*               pEngineFactory,
-                           const EngineWebGPUCreateInfo& EngineCI,
-                           const GraphicsAdapterInfo&    AdapterInfo,
-                           WGPUInstance                  wgpuInstance,
-                           WGPUAdapter                   wgpuAdapter,
-                           WGPUDevice                    wgpuDevice) noexcept(false);
+    struct CreateInfo
+    {
+        IMemoryAllocator&             RawMemAllocator;
+        IEngineFactory* const         pEngineFactory;
+        const EngineWebGPUCreateInfo& EngineCI;
+        const GraphicsAdapterInfo&    AdapterInfo;
+        const DeviceFeatures&         EnabledFeatures;
+        WGPUInstance                  wgpuInstance = {};
+        WGPUAdapter                   wgpuAdapter  = {};
+        WGPUDevice                    wgpuDevice   = {};
+    };
+    RenderDeviceWebGPUImpl(IReferenceCounters* pRefCounters, const CreateInfo& CI) noexcept(false);
 
     ~RenderDeviceWebGPUImpl() override;
 
@@ -136,6 +139,9 @@ public:
     /// Implementation of IRenderDevice::CreatePipelineStateCache() in WebGPU backend.
     void DILIGENT_CALL_TYPE CreatePipelineStateCache(const PipelineStateCacheCreateInfo& CreateInfo,
                                                      IPipelineStateCache**               ppPSOCache) override final;
+
+    /// Implementation of IRenderDevice::CreateDeferredContext() in WebGPU backend.
+    virtual void DILIGENT_CALL_TYPE CreateDeferredContext(IDeviceContext** ppContext) override final;
 
     /// Implementation of IRenderDevice::ReleaseStaleResources() in WebGPU backend.
     void DILIGENT_CALL_TYPE ReleaseStaleResources(bool ForceRelease = false) override final {}
@@ -227,12 +233,12 @@ private:
     WebGPUDeviceWrapper   m_wgpuDevice;
     WGPULimits            m_wgpuLimits{};
 
-    UploadMemoryManagerWebGPUPtr  m_pUploadMemoryManager;
-    DynamicMemoryManagerWebGPUPtr m_pDynamicMemoryManager;
+    std::unique_ptr<UploadMemoryManagerWebGPU>  m_pUploadMemoryManager;
+    std::unique_ptr<DynamicMemoryManagerWebGPU> m_pDynamicMemoryManager;
 
-    AttachmentCleanerWebGPUPtr  m_pAttachmentCleaner;
-    GenerateMipsHelperWebGPUPtr m_pMipsGenerator;
-    QueryManagerWebGPUPtr       m_pQueryManager;
+    std::unique_ptr<AttachmentCleanerWebGPU>  m_pAttachmentCleaner;
+    std::unique_ptr<GenerateMipsHelperWebGPU> m_pMipsGenerator;
+    std::unique_ptr<QueryManagerWebGPU>       m_pQueryManager;
 };
 
 } // namespace Diligent

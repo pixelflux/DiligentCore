@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -649,6 +649,12 @@ void RenderDeviceGLImpl::CreatePipelineStateCache(const PipelineStateCacheCreate
     *ppPSOCache = nullptr;
 }
 
+void RenderDeviceGLImpl::CreateDeferredContext(IDeviceContext** ppContext)
+{
+    LOG_ERROR_MESSAGE("Deferred contexts are not supported in OpenGL backend.");
+    *ppContext = nullptr;
+}
+
 SparseTextureFormatInfo RenderDeviceGLImpl::GetSparseTextureFormatInfo(TEXTURE_FORMAT     TexFormat,
                                                                        RESOURCE_DIMENSION Dimension,
                                                                        Uint32             SampleCount) const
@@ -668,8 +674,8 @@ void RenderDeviceGLImpl::InitAdapterInfo()
 
     // Set graphics adapter properties
     {
-        std::basic_string<GLubyte> glstrVendor = glGetString(GL_VENDOR);
-        std::string                Vendor      = StrToLower(std::string(glstrVendor.begin(), glstrVendor.end()));
+        const std::string glstrVendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+        const std::string Vendor      = StrToLower(glstrVendor);
         LOG_INFO_MESSAGE("GPU Vendor: ", Vendor);
 
         for (size_t i = 0; i < _countof(m_AdapterInfo.Description) - 1 && i < glstrVendor.length(); ++i)
@@ -1009,6 +1015,13 @@ void RenderDeviceGLImpl::InitAdapterInfo()
         const bool bS3TC = CheckExtension("GL_EXT_texture_compression_s3tc") || CheckExtension("GL_WEBGL_compressed_texture_s3tc");
         ENABLE_FEATURE(TextureCompressionBC, bRGTC && bBPTC && bS3TC);
 
+#if PLATFORM_WEB
+        const bool bETC2 = CheckExtension("GL_WEBGL_compressed_texture_etc");
+#else
+        const bool bETC2 = m_DeviceInfo.Type == RENDER_DEVICE_TYPE_GLES || CheckExtension("GL_ARB_ES3_compatibility");
+#endif
+        ENABLE_FEATURE(TextureCompressionETC2, bETC2);
+
         // Buffer properties
         {
             auto& BufferProps{m_AdapterInfo.Buffer};
@@ -1108,7 +1121,7 @@ void RenderDeviceGLImpl::InitAdapterInfo()
         m_AdapterInfo.Queues[0].TextureCopyGranularity[2] = 1;
     }
 
-    ASSERT_SIZEOF(DeviceFeatures, 46, "Did you add a new feature to DeviceFeatures? Please handle its status here.");
+    ASSERT_SIZEOF(DeviceFeatures, 47, "Did you add a new feature to DeviceFeatures? Please handle its status here.");
 }
 
 void RenderDeviceGLImpl::FlagSupportedTexFormats()
@@ -1122,6 +1135,12 @@ void RenderDeviceGLImpl::FlagSupportedTexFormats()
     const bool bS3TC       = CheckExtension("GL_EXT_texture_compression_s3tc") || CheckExtension("GL_WEBGL_compressed_texture_s3tc");
     const bool bTexNorm16  = bDekstopGL || CheckExtension("GL_EXT_texture_norm16"); // Only for ES3.1+
     const bool bTexSwizzle = bDekstopGL || bGLES30OrAbove || CheckExtension("GL_ARB_texture_swizzle");
+
+#if PLATFORM_WEB
+    const bool bETC2 = CheckExtension("GL_WEBGL_compressed_texture_etc");
+#else
+    const bool bETC2 = bGLES30OrAbove || CheckExtension("GL_ARB_ES3_compatibility");
+#endif
 
     //              ||   GLES3.0   ||            GLES3.1              ||            GLES3.2              ||
     // |   Format   ||  CR  |  TF  ||  CR  |  TF  | Req RB | Req. Tex ||  CR  |  TF  | Req RB | Req. Tex ||
@@ -1306,6 +1325,13 @@ void RenderDeviceGLImpl::FlagSupportedTexFormats()
     FlagFormat(TEX_FORMAT_BC7_TYPELESS,               bBPTC);
     FlagFormat(TEX_FORMAT_BC7_UNORM,                  bBPTC,        BIND_SHADER_RESOURCE,   true);
     FlagFormat(TEX_FORMAT_BC7_UNORM_SRGB,             bBPTC,        BIND_SHADER_RESOURCE,   true);
+
+    FlagFormat(TEX_FORMAT_ETC2_RGB8_UNORM,            bETC2,        BIND_SHADER_RESOURCE,   true);
+    FlagFormat(TEX_FORMAT_ETC2_RGB8_UNORM_SRGB,       bETC2,        BIND_SHADER_RESOURCE,   true);
+    FlagFormat(TEX_FORMAT_ETC2_RGB8A1_UNORM,          bETC2,        BIND_SHADER_RESOURCE,   true);
+    FlagFormat(TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB,     bETC2,        BIND_SHADER_RESOURCE,   true);
+    FlagFormat(TEX_FORMAT_ETC2_RGBA8_UNORM,           bETC2,        BIND_SHADER_RESOURCE,   true);
+    FlagFormat(TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB,      bETC2,        BIND_SHADER_RESOURCE,   true);
     // clang-format on
 
 #ifdef DILIGENT_DEVELOPMENT
@@ -1682,9 +1708,54 @@ void RenderDeviceGLImpl::OnDestroyBuffer(BufferGLImpl& Buffer)
         VAOCacheIt.second.OnDestroyBuffer(Buffer);
 }
 
+
+void RenderDeviceGLImpl::PurgeContextCaches(GLContext::NativeGLContextType Context)
+{
+    {
+        Threading::SpinLockGuard FBOCacheGuard{m_FBOCacheLock};
+
+        auto it = m_FBOCache.find(Context);
+        if (it != m_FBOCache.end())
+        {
+            it->second.Clear();
+            m_FBOCache.erase(it);
+        }
+    }
+    {
+        Threading::SpinLockGuard VAOCacheGuard{m_VAOCacheLock};
+
+        auto it = m_VAOCache.find(Context);
+        if (it != m_VAOCache.end())
+        {
+            it->second.Clear();
+            m_VAOCache.erase(it);
+        }
+    }
+}
+
 void RenderDeviceGLImpl::IdleGPU()
 {
     glFinish();
 }
+
+#if PLATFORM_WIN32
+NativeGLContextAttribs RenderDeviceGLImpl::GetNativeGLContextAttribs() const
+{
+    NativeGLContextAttribs Attribs;
+    Attribs.hDC   = m_GLContext.GetWindowHandleToDeviceContext();
+    Attribs.hGLRC = m_GLContext.GetHandle();
+    return Attribs;
+}
+#elif PLATFORM_ANDROID
+NativeGLContextAttribs RenderDeviceGLImpl::GetNativeGLContextAttribs() const
+{
+    NativeGLContextAttribs Attribs;
+    Attribs.Display = m_GLContext.GetDisplay();
+    Attribs.Surface = m_GLContext.GetSurface();
+    Attribs.Context = m_GLContext.GetEGLCtx();
+    Attribs.Config = m_GLContext.GetConfig();
+    return Attribs;
+}
+#endif
 
 } // namespace Diligent

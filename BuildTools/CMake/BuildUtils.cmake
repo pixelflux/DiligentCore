@@ -122,6 +122,11 @@ endif(PLATFORM_WIN32 OR PLATFORM_UNIVERSAL_WINDOWS)
 
 function(set_common_target_properties TARGET)
 
+    # Check if a second argument (MIN_CXX_STANDARD) is provided
+    if(ARGC GREATER 1)
+        set(MIN_CXX_STANDARD ${ARGV1})
+    endif()
+
     if(COMMAND custom_pre_configure_target)
         custom_pre_configure_target(${TARGET})
         if(TARGET_CONFIGURATION_COMPLETE)
@@ -131,10 +136,17 @@ function(set_common_target_properties TARGET)
 
     get_target_property(TARGET_TYPE ${TARGET} TYPE)
 
+    set(CXX_STANDARD 14)
+    if(MIN_CXX_STANDARD)
+        if(MIN_CXX_STANDARD GREATER ${CXX_STANDARD})
+            set(CXX_STANDARD ${MIN_CXX_STANDARD})
+        endif()
+    endif()
+
     set_target_properties(${TARGET} PROPERTIES
         # It is crucial to set CXX_STANDARD flag to only affect c++ files and avoid failures compiling c-files:
         # error: invalid argument '-std=c++14' not allowed with 'C/ObjC'
-        CXX_STANDARD 14
+        CXX_STANDARD ${CXX_STANDARD}
         CXX_STANDARD_REQUIRED ON
     )
 
@@ -198,6 +210,13 @@ function(set_common_target_properties TARGET)
         endif()
     endif() # if(MSVC)
 
+    if (PLATFORM_WEB)
+        if((${CMAKE_BUILD_TYPE} STREQUAL "Debug") AND (TARGET_TYPE STREQUAL EXECUTABLE) AND DILIGENT_EMSCRIPTEN_STRIP_DEBUG_INFO)
+            # Strip debug info from WebAssembly binary. Without this option, the toolchain crashes on CI.
+            target_link_options(${TARGET} PRIVATE "SHELL: -gseparate-dwarf -g0")
+        endif()
+    endif()
+
     if(COMMAND custom_post_configure_target)
         custom_post_configure_target(${TARGET})
     endif()
@@ -230,7 +249,7 @@ endfunction()
 function(get_backend_libraries_type _LIB_TYPE)
     if(PLATFORM_WIN32 OR PLATFORM_LINUX OR PLATFORM_ANDROID OR PLATFORM_UNIVERSAL_WINDOWS OR PLATFORM_MACOS)
         set(LIB_TYPE "shared")
-    elseif(PLATFORM_IOS OR PLATFORM_TVOS OR PLATFORM_EMSCRIPTEN)
+    elseif(PLATFORM_IOS OR PLATFORM_TVOS OR PLATFORM_WEB)
         # Statically link with the engine on iOS, tvOS and Emscripten.
         # It is also possible to link dynamically by
         # putting the library into the framework.
@@ -445,7 +464,7 @@ macro(FetchContent_DeclareShallowGit Name GIT_REPOSITORY GitRepository GIT_TAG G
 endmacro()
 
 function(set_targets_emscripten_properties)
-    if (PLATFORM_EMSCRIPTEN)
+    if (PLATFORM_WEB)
         foreach(_TARGET IN LISTS ARGN)
             get_target_property(_TARGET_TYPE ${_TARGET} TYPE)
             if (_TARGET_TYPE STREQUAL "STATIC_LIBRARY")

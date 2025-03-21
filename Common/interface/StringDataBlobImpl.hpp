@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,11 +40,11 @@
 namespace Diligent
 {
 
-/// Base interface for a file stream
-class StringDataBlobImpl : public Diligent::ObjectBase<IDataBlob>
+/// String data blob implementation.
+class StringDataBlobImpl : public ObjectBase<IDataBlob>
 {
 public:
-    typedef Diligent::ObjectBase<IDataBlob> TBase;
+    typedef ObjectBase<IDataBlob> TBase;
 
     template <typename... ArgsType>
     StringDataBlobImpl(IReferenceCounters* pRefCounters, ArgsType&&... Args) :
@@ -73,15 +73,15 @@ public:
     }
 
     /// Returns the pointer to the internal data buffer
-    virtual void* DILIGENT_CALL_TYPE GetDataPtr() override
+    virtual void* DILIGENT_CALL_TYPE GetDataPtr(size_t Offset = 0) override
     {
-        return &m_String[0];
+        return &m_String[Offset];
     }
 
     /// Returns the pointer to the internal data buffer
-    virtual const void* DILIGENT_CALL_TYPE GetConstDataPtr() const override
+    virtual const void* DILIGENT_CALL_TYPE GetConstDataPtr(size_t Offset = 0) const override
     {
-        return &m_String[0];
+        return &m_String[Offset];
     }
 
 private:

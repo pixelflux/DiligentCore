@@ -160,6 +160,13 @@ public:
         m_FmtToWGPUFmtMap[TEX_FORMAT_BC7_UNORM]        = WGPUTextureFormat_BC7RGBAUnorm;
         m_FmtToWGPUFmtMap[TEX_FORMAT_BC7_UNORM_SRGB]   = WGPUTextureFormat_BC7RGBAUnormSrgb;
 
+        m_FmtToWGPUFmtMap[TEX_FORMAT_ETC2_RGB8_UNORM]        = WGPUTextureFormat_ETC2RGB8Unorm;
+        m_FmtToWGPUFmtMap[TEX_FORMAT_ETC2_RGB8_UNORM_SRGB]   = WGPUTextureFormat_ETC2RGB8UnormSrgb;
+        m_FmtToWGPUFmtMap[TEX_FORMAT_ETC2_RGB8A1_UNORM]      = WGPUTextureFormat_ETC2RGB8A1Unorm;
+        m_FmtToWGPUFmtMap[TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB] = WGPUTextureFormat_ETC2RGB8A1UnormSrgb;
+        m_FmtToWGPUFmtMap[TEX_FORMAT_ETC2_RGBA8_UNORM]       = WGPUTextureFormat_ETC2RGBA8Unorm;
+        m_FmtToWGPUFmtMap[TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB]  = WGPUTextureFormat_ETC2RGBA8UnormSrgb;
+
         m_FmtToWGPUFmtMap[TEX_FORMAT_R10G10B10_XR_BIAS_A2_UNORM] = WGPUTextureFormat_Undefined;
         // clang-format on
     }
@@ -264,12 +271,12 @@ public:
         m_WGPUFmtToTexFmtMap[WGPUTextureFormat_BC7RGBAUnorm]     = TEX_FORMAT_BC7_UNORM;
         m_WGPUFmtToTexFmtMap[WGPUTextureFormat_BC7RGBAUnormSrgb] = TEX_FORMAT_BC7_UNORM_SRGB;
 
-        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8Unorm]       = TEX_FORMAT_UNKNOWN;
-        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8UnormSrgb]   = TEX_FORMAT_UNKNOWN;
-        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8A1Unorm]     = TEX_FORMAT_UNKNOWN;
-        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8A1UnormSrgb] = TEX_FORMAT_UNKNOWN;
-        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGBA8Unorm]      = TEX_FORMAT_UNKNOWN;
-        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGBA8UnormSrgb]  = TEX_FORMAT_UNKNOWN;
+        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8Unorm]       = TEX_FORMAT_ETC2_RGB8_UNORM;
+        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8UnormSrgb]   = TEX_FORMAT_ETC2_RGB8_UNORM_SRGB;
+        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8A1Unorm]     = TEX_FORMAT_ETC2_RGB8A1_UNORM;
+        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGB8A1UnormSrgb] = TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB;
+        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGBA8Unorm]      = TEX_FORMAT_ETC2_RGBA8_UNORM;
+        m_WGPUFmtToTexFmtMap[WGPUTextureFormat_ETC2RGBA8UnormSrgb]  = TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB;
 
         m_WGPUFmtToTexFmtMap[WGPUTextureFormat_EACR11Unorm]  = TEX_FORMAT_UNKNOWN;
         m_WGPUFmtToTexFmtMap[WGPUTextureFormat_EACR11Snorm]  = TEX_FORMAT_UNKNOWN;
@@ -775,13 +782,15 @@ WGPUQueryType QueryTypeToWGPUQueryType(QUERY_TYPE QueryType)
     }
 }
 
-WGPUColorWriteMaskFlags ColorMaskToWGPUColorWriteMask(COLOR_MASK ColorMask)
+WGPUColorWriteMask ColorMaskToWGPUColorWriteMask(COLOR_MASK ColorMask)
 {
     // clang-format off
-    return ((ColorMask & COLOR_MASK_RED)   ? WGPUColorWriteMask_Red   : WGPUColorWriteMask_None) |
+    return static_cast<WGPUColorWriteMask>(
+           ((ColorMask & COLOR_MASK_RED)   ? WGPUColorWriteMask_Red   : WGPUColorWriteMask_None) |
            ((ColorMask & COLOR_MASK_GREEN) ? WGPUColorWriteMask_Green : WGPUColorWriteMask_None) |
            ((ColorMask & COLOR_MASK_BLUE)  ? WGPUColorWriteMask_Blue  : WGPUColorWriteMask_None) |
-           ((ColorMask & COLOR_MASK_ALPHA) ? WGPUColorWriteMask_Alpha : WGPUColorWriteMask_None);
+           ((ColorMask & COLOR_MASK_ALPHA) ? WGPUColorWriteMask_Alpha : WGPUColorWriteMask_None)
+    );
     // clang-format on
 }
 
@@ -905,7 +914,7 @@ WGPUCullMode CullModeToWGPUCullMode(CULL_MODE CullMode)
     }
 }
 
-WGPUShaderStageFlags ShaderTypeToToWGPUShaderStageFlag(SHADER_TYPE Type)
+WGPUShaderStage ShaderTypeToToWGPUShaderStageFlag(SHADER_TYPE Type)
 {
     switch (Type)
     {
@@ -919,13 +928,13 @@ WGPUShaderStageFlags ShaderTypeToToWGPUShaderStageFlag(SHADER_TYPE Type)
     }
 }
 
-WGPUShaderStageFlags ShaderStagesToWGPUShaderStageFlags(SHADER_TYPE Stages)
+WGPUShaderStage ShaderStagesToWGPUShaderStageFlags(SHADER_TYPE Stages)
 {
-    WGPUShaderStageFlags Flags = WGPUShaderStage_None;
+    WGPUShaderStage Flags = WGPUShaderStage_None;
     while (Stages != 0)
     {
         SHADER_TYPE ShaderType = ExtractLSB(Stages);
-        Flags |= ShaderTypeToToWGPUShaderStageFlag(ShaderType);
+        Flags                  = static_cast<WGPUShaderStage>(Flags | ShaderTypeToToWGPUShaderStageFlag(ShaderType));
         Stages &= ~ShaderType;
     }
     return Flags;

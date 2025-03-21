@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -165,6 +165,12 @@ public:
         m_FmtToVkFmtMap[TEX_FORMAT_BC7_TYPELESS]   = VK_FORMAT_BC7_UNORM_BLOCK;
         m_FmtToVkFmtMap[TEX_FORMAT_BC7_UNORM]      = VK_FORMAT_BC7_UNORM_BLOCK;
         m_FmtToVkFmtMap[TEX_FORMAT_BC7_UNORM_SRGB] = VK_FORMAT_BC7_SRGB_BLOCK;
+        m_FmtToVkFmtMap[TEX_FORMAT_ETC2_RGB8_UNORM]        = VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
+        m_FmtToVkFmtMap[TEX_FORMAT_ETC2_RGB8_UNORM_SRGB]   = VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK;
+        m_FmtToVkFmtMap[TEX_FORMAT_ETC2_RGB8A1_UNORM]      = VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK;
+        m_FmtToVkFmtMap[TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB] = VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK;
+        m_FmtToVkFmtMap[TEX_FORMAT_ETC2_RGBA8_UNORM]       = VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK;
+        m_FmtToVkFmtMap[TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB]  = VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK;
         // clang-format on
     }
 
@@ -334,7 +340,7 @@ public:
         m_VkFmtToTexFmtMap[VK_FORMAT_R64G64B64A64_SINT]     = TEX_FORMAT_UNKNOWN;
         m_VkFmtToTexFmtMap[VK_FORMAT_R64G64B64A64_SFLOAT]   = TEX_FORMAT_UNKNOWN;
 
-        m_VkFmtToTexFmtMap[VK_FORMAT_B10G11R11_UFLOAT_PACK32]   = TEX_FORMAT_UNKNOWN;
+        m_VkFmtToTexFmtMap[VK_FORMAT_B10G11R11_UFLOAT_PACK32]   = TEX_FORMAT_R11G11B10_FLOAT;
         m_VkFmtToTexFmtMap[VK_FORMAT_E5B9G9R9_UFLOAT_PACK32]    = TEX_FORMAT_RGB9E5_SHAREDEXP;
         m_VkFmtToTexFmtMap[VK_FORMAT_D16_UNORM]                 = TEX_FORMAT_D16_UNORM;
         m_VkFmtToTexFmtMap[VK_FORMAT_X8_D24_UNORM_PACK32]       = TEX_FORMAT_UNKNOWN;
@@ -361,12 +367,13 @@ public:
         m_VkFmtToTexFmtMap[VK_FORMAT_BC7_UNORM_BLOCK]           = TEX_FORMAT_BC7_UNORM;
         m_VkFmtToTexFmtMap[VK_FORMAT_BC7_SRGB_BLOCK]            = TEX_FORMAT_BC7_UNORM_SRGB;
 
-        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK]   = TEX_FORMAT_UNKNOWN;
-        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK]    = TEX_FORMAT_UNKNOWN;
-        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK] = TEX_FORMAT_UNKNOWN;
-        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK]  = TEX_FORMAT_UNKNOWN;
-        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK] = TEX_FORMAT_UNKNOWN;
-        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK]  = TEX_FORMAT_UNKNOWN;
+        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK]   = TEX_FORMAT_ETC2_RGB8_UNORM;
+        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK]    = TEX_FORMAT_ETC2_RGB8_UNORM_SRGB;
+        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK] = TEX_FORMAT_ETC2_RGB8A1_UNORM;
+        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK]  = TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB;
+        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK] = TEX_FORMAT_ETC2_RGBA8_UNORM;
+        m_VkFmtToTexFmtMap[VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK]  = TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB;
+
         m_VkFmtToTexFmtMap[VK_FORMAT_EAC_R11_UNORM_BLOCK]       = TEX_FORMAT_UNKNOWN;
         m_VkFmtToTexFmtMap[VK_FORMAT_EAC_R11_SNORM_BLOCK]       = TEX_FORMAT_UNKNOWN;
         m_VkFmtToTexFmtMap[VK_FORMAT_EAC_R11G11_UNORM_BLOCK]    = TEX_FORMAT_UNKNOWN;
@@ -701,14 +708,14 @@ VkPipelineRasterizationStateCreateInfo RasterizerStateDesc_To_VkRasterizationSta
 
     // If depth clamping is enabled, before the incoming fragment's zf is compared to za, zf is clamped to
     // [min(n,f), max(n,f)], where n and f are the minDepth and maxDepth depth range values of the viewport
-    // used by this fragment, respectively (25.10)
+    // used by this fragment, respectively
     // This value is the opposite of clip enable
     RSStateCI.depthClampEnable = RasterizerDesc.DepthClipEnable ? VK_FALSE : VK_TRUE;
 
-    RSStateCI.rasterizerDiscardEnable = VK_FALSE;                                                                                         // Whether primitives are discarded immediately before the rasterization stage.
-    RSStateCI.polygonMode             = FillModeToVkPolygonMode(RasterizerDesc.FillMode);                                                 // 24.7.2
-    RSStateCI.cullMode                = CullModeToVkCullMode(RasterizerDesc.CullMode);                                                    // 24.7.1
-    RSStateCI.frontFace               = RasterizerDesc.FrontCounterClockwise ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE; // 24.7.1
+    RSStateCI.rasterizerDiscardEnable = VK_FALSE; // Whether primitives are discarded immediately before the rasterization stage.
+    RSStateCI.polygonMode             = FillModeToVkPolygonMode(RasterizerDesc.FillMode);
+    RSStateCI.cullMode                = CullModeToVkCullMode(RasterizerDesc.CullMode);
+    RSStateCI.frontFace               = RasterizerDesc.FrontCounterClockwise ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
     // Depth bias (24.7.3)
     RSStateCI.depthBiasEnable = (RasterizerDesc.DepthBias != 0 || RasterizerDesc.SlopeScaledDepthBias != 0.f) ? VK_TRUE : VK_FALSE;
     RSStateCI.depthBiasConstantFactor =
@@ -719,7 +726,7 @@ VkPipelineRasterizationStateCreateInfo RasterizerStateDesc_To_VkRasterizationSta
         RasterizerDesc.SlopeScaledDepthBias; //  a scalar factor applied to a fragment's slope in depth bias calculations.
     RSStateCI.lineWidth = 1.f;               // If the wide lines feature is not enabled, and no element of the pDynamicStates member of
                                              // pDynamicState is VK_DYNAMIC_STATE_LINE_WIDTH, the lineWidth member of
-                                             // pRasterizationState must be 1.0 (9.2)
+                                             // pRasterizationState must be 1.0
 
     return RSStateCI;
 }
@@ -785,12 +792,12 @@ VkStencilOpState StencilOpDescToVkStencilOpState(const StencilOpDesc& desc, Uint
 
     // The s least significant bits of compareMask,  where s is the number of bits in the stencil framebuffer attachment,
     // are bitwise ANDed with both the reference and the stored stencil value, and the resulting masked values are those
-    // that participate in the comparison controlled by compareOp (25.9)
+    // that participate in the comparison controlled by compareOp
     StencilState.compareMask = StencilReadMask;
 
     // The least significant s bits of writeMask, where s is the number of bits in the stencil framebuffer
     // attachment, specify an integer mask. Where a 1 appears in this mask, the corresponding bit in the stencil
-    // value in the depth / stencil attachment is written; where a 0 appears, the bit is not written (25.9)
+    // value in the depth / stencil attachment is written; where a 0 appears, the bit is not written
     StencilState.writeMask = StencilWriteMask;
 
     StencilState.reference = 0; // Set dynamically
@@ -801,7 +808,7 @@ VkStencilOpState StencilOpDescToVkStencilOpState(const StencilOpDesc& desc, Uint
 
 VkPipelineDepthStencilStateCreateInfo DepthStencilStateDesc_To_VkDepthStencilStateCI(const DepthStencilStateDesc& DepthStencilDesc)
 {
-    // Depth-stencil state (25.7)
+    // Depth-stencil state
     VkPipelineDepthStencilStateCreateInfo DSStateCI = {};
 
     DSStateCI.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -814,7 +821,7 @@ VkPipelineDepthStencilStateCreateInfo DepthStencilStateDesc_To_VkDepthStencilSta
     DSStateCI.stencilTestEnable     = DepthStencilDesc.StencilEnable ? VK_TRUE : VK_FALSE;     // 25.9
     DSStateCI.front                 = StencilOpDescToVkStencilOpState(DepthStencilDesc.FrontFace, DepthStencilDesc.StencilReadMask, DepthStencilDesc.StencilWriteMask);
     DSStateCI.back                  = StencilOpDescToVkStencilOpState(DepthStencilDesc.BackFace, DepthStencilDesc.StencilReadMask, DepthStencilDesc.StencilWriteMask);
-    // Depth Bounds Test (25.8)
+    // Depth Bounds Test
     DSStateCI.minDepthBounds = 0; // must be between 0.0 and 1.0, inclusive
     DSStateCI.maxDepthBounds = 1; // must be between 0.0 and 1.0, inclusive
 
@@ -826,7 +833,6 @@ class BlendFactorToVkBlendFactorMapper
 public:
     BlendFactorToVkBlendFactorMapper()
     {
-        // 26.1.1
         m_Map[BLEND_FACTOR_ZERO]             = VK_BLEND_FACTOR_ZERO;
         m_Map[BLEND_FACTOR_ONE]              = VK_BLEND_FACTOR_ONE;
         m_Map[BLEND_FACTOR_SRC_COLOR]        = VK_BLEND_FACTOR_SRC_COLOR;
@@ -862,7 +868,6 @@ class LogicOperationToVkLogicOp
 public:
     LogicOperationToVkLogicOp()
     {
-        // 26.2
         m_Map[LOGIC_OP_CLEAR]         = VK_LOGIC_OP_CLEAR;
         m_Map[LOGIC_OP_SET]           = VK_LOGIC_OP_SET;
         m_Map[LOGIC_OP_COPY]          = VK_LOGIC_OP_COPY;
@@ -896,7 +901,6 @@ class BlendOperationToVkBlendOp
 public:
     BlendOperationToVkBlendOp()
     {
-        // 26.1.3
         m_Map[BLEND_OPERATION_ADD]          = VK_BLEND_OP_ADD;
         m_Map[BLEND_OPERATION_SUBTRACT]     = VK_BLEND_OP_SUBTRACT;
         m_Map[BLEND_OPERATION_REV_SUBTRACT] = VK_BLEND_OP_REVERSE_SUBTRACT;
@@ -914,6 +918,20 @@ private:
     std::array<VkBlendOp, BLEND_OPERATION_NUM_OPERATIONS> m_Map = {};
 };
 
+VkColorComponentFlags ColorMaskToVkColorComponentFlags(COLOR_MASK ColorMask)
+{
+    VkColorComponentFlags Flags = 0;
+    if (ColorMask & COLOR_MASK_RED)
+        Flags |= VK_COLOR_COMPONENT_R_BIT;
+    if (ColorMask & COLOR_MASK_GREEN)
+        Flags |= VK_COLOR_COMPONENT_G_BIT;
+    if (ColorMask & COLOR_MASK_BLUE)
+        Flags |= VK_COLOR_COMPONENT_B_BIT;
+    if (ColorMask & COLOR_MASK_ALPHA)
+        Flags |= VK_COLOR_COMPONENT_A_BIT;
+    return Flags;
+}
+
 VkPipelineColorBlendAttachmentState RenderTargetBlendDescToVkColorBlendAttachmentState(const RenderTargetBlendDesc& RTBlendDesc)
 {
     static const BlendFactorToVkBlendFactorMapper BFtoVKBF;
@@ -927,11 +945,7 @@ VkPipelineColorBlendAttachmentState RenderTargetBlendDescToVkColorBlendAttachmen
     AttachmentBlendState.srcAlphaBlendFactor = BFtoVKBF[RTBlendDesc.SrcBlendAlpha];
     AttachmentBlendState.dstAlphaBlendFactor = BFtoVKBF[RTBlendDesc.DestBlendAlpha];
     AttachmentBlendState.alphaBlendOp        = BOtoVKBO[RTBlendDesc.BlendOpAlpha];
-    AttachmentBlendState.colorWriteMask =
-        ((RTBlendDesc.RenderTargetWriteMask & COLOR_MASK_RED) ? VK_COLOR_COMPONENT_R_BIT : 0) |
-        ((RTBlendDesc.RenderTargetWriteMask & COLOR_MASK_GREEN) ? VK_COLOR_COMPONENT_G_BIT : 0) |
-        ((RTBlendDesc.RenderTargetWriteMask & COLOR_MASK_BLUE) ? VK_COLOR_COMPONENT_B_BIT : 0) |
-        ((RTBlendDesc.RenderTargetWriteMask & COLOR_MASK_ALPHA) ? VK_COLOR_COMPONENT_A_BIT : 0);
+    AttachmentBlendState.colorWriteMask      = ColorMaskToVkColorComponentFlags(RTBlendDesc.RenderTargetWriteMask);
 
     return AttachmentBlendState;
 }
@@ -940,13 +954,15 @@ void BlendStateDesc_To_VkBlendStateCI(const BlendStateDesc&                     
                                       VkPipelineColorBlendStateCreateInfo&              ColorBlendStateCI,
                                       std::vector<VkPipelineColorBlendAttachmentState>& ColorBlendAttachments)
 {
-    // Color blend state (26.1)
+    const RenderTargetBlendDesc& RT0BlendState = BSDesc.RenderTargets[0];
+
+    // Color blend state
     static const LogicOperationToVkLogicOp LogicOpToVkLogicOp;
     ColorBlendStateCI.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     ColorBlendStateCI.pNext             = nullptr;
-    ColorBlendStateCI.flags             = 0;                                            // reserved for future use
-    ColorBlendStateCI.logicOpEnable     = BSDesc.RenderTargets[0].LogicOperationEnable; // 26.2
-    ColorBlendStateCI.logicOp           = LogicOpToVkLogicOp[BSDesc.RenderTargets[0].LogicOp];
+    ColorBlendStateCI.flags             = 0; // reserved for future use
+    ColorBlendStateCI.logicOpEnable     = RT0BlendState.LogicOperationEnable;
+    ColorBlendStateCI.logicOp           = LogicOpToVkLogicOp[RT0BlendState.LogicOp];
     ColorBlendStateCI.blendConstants[0] = 0.f; // We use dynamic blend constants
     ColorBlendStateCI.blendConstants[1] = 0.f;
     ColorBlendStateCI.blendConstants[2] = 0.f;
@@ -954,8 +970,13 @@ void BlendStateDesc_To_VkBlendStateCI(const BlendStateDesc&                     
     // attachmentCount must equal the colorAttachmentCount for the subpass in which this pipeline is used.
     for (uint32_t attachment = 0; attachment < ColorBlendStateCI.attachmentCount; ++attachment)
     {
-        const auto& RTBlendState          = BSDesc.IndependentBlendEnable ? BSDesc.RenderTargets[attachment] : BSDesc.RenderTargets[0];
-        ColorBlendAttachments[attachment] = RenderTargetBlendDescToVkColorBlendAttachmentState(RTBlendState);
+        const RenderTargetBlendDesc&         RTBlendState = BSDesc.RenderTargets[attachment];
+        VkPipelineColorBlendAttachmentState& Attachment   = ColorBlendAttachments[attachment];
+
+        Attachment = RenderTargetBlendDescToVkColorBlendAttachmentState(BSDesc.IndependentBlendEnable ? RTBlendState : RT0BlendState);
+
+        // Color write mask should always be set for each attachment even if blend is disabled
+        Attachment.colorWriteMask = ColorMaskToVkColorComponentFlags(RTBlendState.RenderTargetWriteMask);
     }
 }
 
@@ -983,7 +1004,7 @@ void InputLayoutDesc_To_VkVertexInputStateCI(const InputLayoutDesc&             
                                              std::array<VkVertexInputAttributeDescription, MAX_LAYOUT_ELEMENTS>&         AttributeDescription,
                                              std::array<VkVertexInputBindingDivisorDescriptionEXT, MAX_LAYOUT_ELEMENTS>& VertexBindingDivisors)
 {
-    // Vertex input description (20.2)
+    // Vertex input description
     VertexInputStateCI.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     VertexInputStateCI.pNext                           = nullptr;
     VertexInputStateCI.flags                           = 0; // reserved for future use.
@@ -1001,23 +1022,23 @@ void InputLayoutDesc_To_VkVertexInputStateCI(const InputLayoutDesc&             
     BufferSlot2BindingDescInd.fill(-1);
     for (Uint32 elem = 0; elem < LayoutDesc.NumElements; ++elem)
     {
-        auto& LayoutElem     = LayoutDesc.LayoutElements[elem];
-        auto& BindingDescInd = BufferSlot2BindingDescInd[LayoutElem.BufferSlot];
+        const LayoutElement& LayoutElem     = LayoutDesc.LayoutElements[elem];
+        Int32&               BindingDescInd = BufferSlot2BindingDescInd[LayoutElem.BufferSlot];
         if (BindingDescInd < 0)
         {
-            BindingDescInd        = VertexInputStateCI.vertexBindingDescriptionCount++;
-            auto& BindingDesc     = BindingDescriptions[BindingDescInd];
+            BindingDescInd = VertexInputStateCI.vertexBindingDescriptionCount++;
+            VkVertexInputBindingDescription& BindingDesc{BindingDescriptions[BindingDescInd]};
             BindingDesc.binding   = LayoutElem.BufferSlot;
             BindingDesc.stride    = LayoutElem.Stride;
             BindingDesc.inputRate = LayoutElemFrequencyToVkInputRate(LayoutElem.Frequency);
         }
 
-        const auto& BindingDesc = BindingDescriptions[BindingDescInd];
+        const VkVertexInputBindingDescription& BindingDesc = BindingDescriptions[BindingDescInd];
         VERIFY(BindingDesc.binding == LayoutElem.BufferSlot, "Inconsistent buffer slot");
         VERIFY(BindingDesc.stride == LayoutElem.Stride, "Inconsistent strides");
         VERIFY(BindingDesc.inputRate == LayoutElemFrequencyToVkInputRate(LayoutElem.Frequency), "Inconsistent layout element frequency");
 
-        auto& AttribDesc    = AttributeDescription[elem];
+        VkVertexInputAttributeDescription& AttribDesc{AttributeDescription[elem]};
         AttribDesc.binding  = BindingDesc.binding;
         AttribDesc.location = LayoutElem.InputIndex;
         AttribDesc.format   = TypeToVkFormat(LayoutElem.ValueType, LayoutElem.NumComponents, LayoutElem.IsNormalized);
@@ -1025,7 +1046,7 @@ void InputLayoutDesc_To_VkVertexInputStateCI(const InputLayoutDesc&             
 
         if (LayoutElem.Frequency == INPUT_ELEMENT_FREQUENCY_PER_INSTANCE && LayoutElem.InstanceDataStepRate != 1)
         {
-            auto& AttribDivisor   = VertexBindingDivisors[VertexInputDivisorCI.vertexBindingDivisorCount++];
+            VkVertexInputBindingDivisorDescriptionEXT& AttribDivisor{VertexBindingDivisors[VertexInputDivisorCI.vertexBindingDivisorCount++]};
             AttribDivisor.binding = BindingDesc.binding;
             AttribDivisor.divisor = LayoutElem.InstanceDataStepRate;
         }
@@ -1233,7 +1254,7 @@ VkPipelineStageFlags ResourceStateFlagsToVkPipelineStageFlags(RESOURCE_STATE Sta
     VkPipelineStageFlags vkPipelineStages = 0;
     while (StateFlags != RESOURCE_STATE_UNKNOWN)
     {
-        auto StateBit = ExtractLSB(StateFlags);
+        RESOURCE_STATE StateBit = ExtractLSB(StateFlags);
         vkPipelineStages |= ResourceStateFlagToVkPipelineStage(StateBit);
     }
     return vkPipelineStages;
@@ -1297,7 +1318,7 @@ VkPipelineStageFlags ResourceStateFlagsToVkAccessFlags(RESOURCE_STATE StateFlags
     VkAccessFlags AccessFlags = 0;
     while (StateFlags != RESOURCE_STATE_UNKNOWN)
     {
-        auto StateBit = ExtractLSB(StateFlags);
+        RESOURCE_STATE StateBit = ExtractLSB(StateFlags);
         AccessFlags |= ResourceStateFlagToVkAccessFlags(StateBit);
     }
     return AccessFlags;
@@ -1313,7 +1334,7 @@ VkAccessFlags AccelStructStateFlagsToVkAccessFlags(RESOURCE_STATE StateFlags)
     Uint32        Bits        = StateFlags;
     while (Bits != 0)
     {
-        auto Bit = ExtractLSB(Bits);
+        Uint32 Bit = ExtractLSB(Bits);
         switch (Bit)
         {
             // clang-format off
@@ -1399,7 +1420,7 @@ RESOURCE_STATE VkAccessFlagsToResourceStates(VkAccessFlags AccessFlags)
     Uint32                                         State = 0;
     while (AccessFlags != 0)
     {
-        auto lsb = PlatformMisc::GetLSB(AccessFlags);
+        Uint32 lsb = PlatformMisc::GetLSB(AccessFlags);
         State |= BitPosToState(lsb);
         AccessFlags &= ~(1 << lsb);
     }
@@ -1664,7 +1685,7 @@ VkShaderStageFlags ShaderTypesToVkShaderStageFlags(SHADER_TYPE ShaderTypes)
     VkShaderStageFlags Result = 0;
     while (ShaderTypes != SHADER_TYPE_UNKNOWN)
     {
-        auto Type = ExtractLSB(ShaderTypes);
+        SHADER_TYPE Type = ExtractLSB(ShaderTypes);
         Result |= ShaderTypeToVkShaderStageFlagBit(Type);
     }
     return Result;
@@ -1685,7 +1706,7 @@ SHADER_TYPE VkShaderStageFlagsToShaderTypes(VkShaderStageFlags StageFlags)
     SHADER_TYPE Result = SHADER_TYPE_UNKNOWN;
     while (StageFlags != 0)
     {
-        auto Type = ExtractLSB(StageFlags);
+        VkShaderStageFlags Type = ExtractLSB(StageFlags);
 
         static_assert(SHADER_TYPE_LAST == 0x4000, "Please update the switch below to handle the new shader type");
         switch (Type)
@@ -1721,7 +1742,7 @@ VkBuildAccelerationStructureFlagsKHR BuildASFlagsToVkBuildAccelerationStructureF
     VkBuildAccelerationStructureFlagsKHR Result = 0;
     while (Flags != RAYTRACING_BUILD_AS_NONE)
     {
-        auto FlagBit = ExtractLSB(Flags);
+        RAYTRACING_BUILD_AS_FLAGS FlagBit = ExtractLSB(Flags);
         switch (FlagBit)
         {
             // clang-format off
@@ -1745,7 +1766,7 @@ VkGeometryFlagsKHR GeometryFlagsToVkGeometryFlags(RAYTRACING_GEOMETRY_FLAGS Flag
     VkGeometryFlagsKHR Result = 0;
     while (Flags != RAYTRACING_GEOMETRY_FLAG_NONE)
     {
-        auto FlagBit = ExtractLSB(Flags);
+        RAYTRACING_GEOMETRY_FLAGS FlagBit = ExtractLSB(Flags);
         switch (FlagBit)
         {
             // clang-format off
@@ -1766,7 +1787,7 @@ VkGeometryInstanceFlagsKHR InstanceFlagsToVkGeometryInstanceFlags(RAYTRACING_INS
     VkGeometryInstanceFlagsKHR Result = 0;
     while (Flags != RAYTRACING_INSTANCE_NONE)
     {
-        auto FlagBit = ExtractLSB(Flags);
+        RAYTRACING_INSTANCE_FLAGS FlagBit = ExtractLSB(Flags);
         switch (FlagBit)
         {
             // clang-format off
@@ -1803,7 +1824,7 @@ WAVE_FEATURE VkSubgroupFeatureFlagsToWaveFeatures(VkSubgroupFeatureFlags Feature
     WAVE_FEATURE Result = WAVE_FEATURE_UNKNOWN;
     while (FeatureFlags != 0)
     {
-        auto Feature = ExtractLSB(FeatureFlags);
+        VkSubgroupFeatureFlags Feature = ExtractLSB(FeatureFlags);
         static_assert(WAVE_FEATURE_LAST == WAVE_FEATURE_QUAD,
                       "Please update the switch below to handle the new wave feature");
         switch (Feature)
@@ -1892,8 +1913,8 @@ VkExtent2D ShadingRateToVkFragmentSize(SHADING_RATE Rate)
 SHADING_RATE VkFragmentSizeToShadingRate(const VkExtent2D& Size)
 {
     VERIFY_EXPR(IsPowerOfTwo(Size.width) && IsPowerOfTwo(Size.height));
-    auto X = PlatformMisc::GetMSB(Size.width);
-    auto Y = PlatformMisc::GetMSB(Size.height);
+    uint32_t X = PlatformMisc::GetMSB(Size.width);
+    uint32_t Y = PlatformMisc::GetMSB(Size.height);
     VERIFY_EXPR((1u << X) == Size.width);
     VERIFY_EXPR((1u << Y) == Size.height);
     return static_cast<SHADING_RATE>((X << SHADING_RATE_X_SHIFT) | Y);
@@ -1932,7 +1953,7 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
 
     // Enable features
 #define INIT_FEATURE(FeatureName, Supported) \
-    Features.FeatureName = (Supported) ? OptionalState : DEVICE_FEATURE_STATE_DISABLED;
+    Features.FeatureName = (Supported) ? OptionalState : DEVICE_FEATURE_STATE_DISABLED
 
     // The following features are always enabled
     Features.SeparablePrograms             = DEVICE_FEATURE_STATE_ENABLED;
@@ -1964,39 +1985,40 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
     INIT_FEATURE(DualSourceBlend,                   vkFeatures.dualSrcBlend);
     INIT_FEATURE(MultiViewport,                     vkFeatures.multiViewport);
     INIT_FEATURE(TextureCompressionBC,              vkFeatures.textureCompressionBC);
+    INIT_FEATURE(TextureCompressionETC2,            vkFeatures.textureCompressionETC2);
     INIT_FEATURE(VertexPipelineUAVWritesAndAtomics, vkFeatures.vertexPipelineStoresAndAtomics);
     INIT_FEATURE(PixelUAVWritesAndAtomics,          vkFeatures.fragmentStoresAndAtomics);
     INIT_FEATURE(TextureUAVExtendedFormats,         vkFeatures.shaderStorageImageExtendedFormats);
     INIT_FEATURE(SparseResources,                   vkFeatures.sparseBinding && (vkFeatures.sparseResidencyBuffer || vkFeatures.sparseResidencyImage2D)); // requires support for resident resources
     // clang-format on
 
-    const auto& MeshShaderFeats = ExtFeatures.MeshShader;
+    const VkPhysicalDeviceMeshShaderFeaturesEXT& MeshShaderFeats = ExtFeatures.MeshShader;
     INIT_FEATURE(MeshShaders, MeshShaderFeats.taskShader != VK_FALSE && MeshShaderFeats.meshShader != VK_FALSE);
 
-    const auto& ShaderFloat16Int8Feats = ExtFeatures.ShaderFloat16Int8;
+    const VkPhysicalDeviceShaderFloat16Int8FeaturesKHR& ShaderFloat16Int8Feats = ExtFeatures.ShaderFloat16Int8;
     // clang-format off
     INIT_FEATURE(ShaderFloat16, ShaderFloat16Int8Feats.shaderFloat16 != VK_FALSE);
     INIT_FEATURE(ShaderInt8,    ShaderFloat16Int8Feats.shaderInt8    != VK_FALSE);
     // clang-format on
 
-    const auto& Storage16BitFeats = ExtFeatures.Storage16Bit;
+    const VkPhysicalDevice16BitStorageFeaturesKHR& Storage16BitFeats = ExtFeatures.Storage16Bit;
     // clang-format off
     INIT_FEATURE(ResourceBuffer16BitAccess, Storage16BitFeats.storageBuffer16BitAccess           != VK_FALSE && vkFeatures.shaderInt16 != VK_FALSE);
     INIT_FEATURE(UniformBuffer16BitAccess,  Storage16BitFeats.uniformAndStorageBuffer16BitAccess != VK_FALSE && vkFeatures.shaderInt16 != VK_FALSE);
     INIT_FEATURE(ShaderInputOutput16,       Storage16BitFeats.storageInputOutput16               != VK_FALSE && vkFeatures.shaderInt16 != VK_FALSE);
     // clang-format on
 
-    const auto& Storage8BitFeats = ExtFeatures.Storage8Bit;
+    const VkPhysicalDevice8BitStorageFeaturesKHR& Storage8BitFeats = ExtFeatures.Storage8Bit;
     // clang-format off
     INIT_FEATURE(ResourceBuffer8BitAccess, Storage8BitFeats.storageBuffer8BitAccess           != VK_FALSE);
     INIT_FEATURE(UniformBuffer8BitAccess,  Storage8BitFeats.uniformAndStorageBuffer8BitAccess != VK_FALSE);
     // clang-format on
 
-    const auto& DescrIndexingFeats = ExtFeatures.DescriptorIndexing;
+    const VkPhysicalDeviceDescriptorIndexingFeaturesEXT& DescrIndexingFeats = ExtFeatures.DescriptorIndexing;
     INIT_FEATURE(ShaderResourceRuntimeArrays, DescrIndexingFeats.runtimeDescriptorArray != VK_FALSE);
-    const auto& AccelStructFeats = ExtFeatures.AccelStruct;
-    const auto& RayTracingFeats  = ExtFeatures.RayTracingPipeline;
-    const auto& RayQueryFeats    = ExtFeatures.RayQuery;
+    const VkPhysicalDeviceAccelerationStructureFeaturesKHR& AccelStructFeats = ExtFeatures.AccelStruct;
+    const VkPhysicalDeviceRayTracingPipelineFeaturesKHR&    RayTracingFeats  = ExtFeatures.RayTracingPipeline;
+    const VkPhysicalDeviceRayQueryFeaturesKHR&              RayQueryFeats    = ExtFeatures.RayQuery;
     // clang-format off
     INIT_FEATURE(RayTracing,
                  vkVersion                              >= VK_API_VERSION_1_1 &&
@@ -2004,9 +2026,9 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
                  (RayTracingFeats.rayTracingPipeline != VK_FALSE || RayQueryFeats.rayQuery != VK_FALSE));
     // clang-format on
 
-    const auto& SubgroupProps          = ExtProps.Subgroup;
-    const auto  RequiredSubgroupFeats  = VK_SUBGROUP_FEATURE_BASIC_BIT;
-    const auto  RequiredSubgroupStages = VK_SHADER_STAGE_COMPUTE_BIT;
+    const VkPhysicalDeviceSubgroupProperties& SubgroupProps          = ExtProps.Subgroup;
+    const VkSubgroupFeatureFlagBits           RequiredSubgroupFeats  = VK_SUBGROUP_FEATURE_BASIC_BIT;
+    const VkShaderStageFlagBits               RequiredSubgroupStages = VK_SHADER_STAGE_COMPUTE_BIT;
     Features.WaveOp =
         (vkVersion >= VK_API_VERSION_1_1 &&
          (SubgroupProps.supportedOperations & RequiredSubgroupFeats) == RequiredSubgroupFeats &&
@@ -2014,12 +2036,12 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
         DEVICE_FEATURE_STATE_ENABLED :
         DEVICE_FEATURE_STATE_DISABLED;
 
-    const auto& VertexAttribDivisorFeats = ExtFeatures.VertexAttributeDivisor;
+    const VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT& VertexAttribDivisorFeats = ExtFeatures.VertexAttributeDivisor;
     INIT_FEATURE(InstanceDataStepRate,
                  (VertexAttribDivisorFeats.vertexAttributeInstanceRateDivisor != VK_FALSE &&
                   VertexAttribDivisorFeats.vertexAttributeInstanceRateZeroDivisor != VK_FALSE));
 
-    const auto& TimelineSemaphoreFeats = ExtFeatures.TimelineSemaphore;
+    const VkPhysicalDeviceTimelineSemaphoreFeaturesKHR& TimelineSemaphoreFeats = ExtFeatures.TimelineSemaphore;
     INIT_FEATURE(NativeFence,
                  TimelineSemaphoreFeats.timelineSemaphore != VK_FALSE);
 
@@ -2039,16 +2061,29 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
 
 #undef INIT_FEATURE
 
-    // Not supported in Vulkan on top of Metal.
-#if PLATFORM_MACOS || PLATFORM_IOS || PLATFORM_TVOS
-    Features.BinaryOcclusionQueries = DEVICE_FEATURE_STATE_DISABLED;
-    Features.TimestampQueries       = DEVICE_FEATURE_STATE_DISABLED;
-    Features.DurationQueries        = DEVICE_FEATURE_STATE_DISABLED;
-#endif
-
-    ASSERT_SIZEOF(DeviceFeatures, 46, "Did you add a new feature to DeviceFeatures? Please handle its status here (if necessary).");
+    ASSERT_SIZEOF(DeviceFeatures, 47, "Did you add a new feature to DeviceFeatures? Please handle its status here (if necessary).");
 
     return Features;
+}
+
+DeviceFeaturesVk PhysicalDeviceFeaturesToDeviceFeaturesVk(const VulkanUtilities::VulkanPhysicalDevice::ExtensionFeatures& ExtFeatures,
+                                                          DEVICE_FEATURE_STATE                                            OptionalState)
+{
+    VERIFY_EXPR(OptionalState != DEVICE_FEATURE_STATE_DISABLED);
+
+    DeviceFeaturesVk FeaturesVk;
+
+#define INIT_FEATURE(FeatureName, Supported) \
+    FeaturesVk.FeatureName = (Supported) ? OptionalState : DEVICE_FEATURE_STATE_DISABLED
+
+    INIT_FEATURE(DynamicRendering, ExtFeatures.DynamicRendering.dynamicRendering != VK_FALSE);
+    INIT_FEATURE(HostImageCopy, ExtFeatures.HostImageCopy.hostImageCopy != VK_FALSE);
+
+#undef INIT_FEATURE
+
+    ASSERT_SIZEOF(DeviceFeaturesVk, 2, "Did you add a new feature to DeviceFeaturesVk? Please handle its status here (if necessary).");
+
+    return FeaturesVk;
 }
 
 SPARSE_TEXTURE_FLAGS VkSparseImageFormatFlagsToSparseTextureFlags(VkSparseImageFormatFlags Flags)
@@ -2056,7 +2091,7 @@ SPARSE_TEXTURE_FLAGS VkSparseImageFormatFlagsToSparseTextureFlags(VkSparseImageF
     SPARSE_TEXTURE_FLAGS Result = SPARSE_TEXTURE_FLAG_NONE;
     while (Flags != 0)
     {
-        auto FlagBit = static_cast<VkSparseImageFormatFlagBits>(ExtractLSB(Flags));
+        VkSparseImageFormatFlagBits FlagBit = static_cast<VkSparseImageFormatFlagBits>(ExtractLSB(Flags));
         static_assert(SPARSE_TEXTURE_FLAG_LAST == (1u << 2), "This function must be updated to handle new sparse texture flag");
         switch (FlagBit)
         {
@@ -2077,7 +2112,7 @@ VkImageUsageFlags BindFlagsToVkImageUsage(BIND_FLAGS Flags, bool IsMemoryless, b
     VkImageUsageFlags Result = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     while (Flags != BIND_NONE)
     {
-        auto FlagBit = ExtractLSB(Flags);
+        BIND_FLAGS FlagBit = ExtractLSB(Flags);
         static_assert(BIND_FLAG_LAST == (1u << 11), "This function must be updated to handle new bind flag");
         switch (FlagBit)
         {
@@ -2119,7 +2154,7 @@ void GetAllowedStagesAndAccessMask(BIND_FLAGS Flags, VkPipelineStageFlags& Stage
     AccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
     while (Flags != BIND_NONE)
     {
-        auto FlagBit = ExtractLSB(Flags);
+        BIND_FLAGS FlagBit = ExtractLSB(Flags);
         static_assert(BIND_FLAG_LAST == (1u << 11), "This function must be updated to handle new bind flag");
         switch (FlagBit)
         {
@@ -2200,6 +2235,52 @@ VkComponentMapping TextureComponentMappingToVkComponentMapping(const TextureComp
         TextureComponentSwizzleToVkComponentSwizzle(Mapping.B),
         TextureComponentSwizzleToVkComponentSwizzle(Mapping.A) //
     };
+}
+
+VkPipelineRenderingCreateInfoKHR GraphicsPipelineDesc_To_VkPipelineRenderingCreateInfo(const GraphicsPipelineDesc& PipelineDesc,
+                                                                                       std::vector<VkFormat>&      ColorAttachmentFormats)
+{
+    VkPipelineRenderingCreateInfoKHR PipelineRenderingCI{};
+    PipelineRenderingCI.sType    = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+    PipelineRenderingCI.pNext    = nullptr;
+    PipelineRenderingCI.viewMask = 0;
+
+    PipelineRenderingCI.colorAttachmentCount = PipelineDesc.NumRenderTargets;
+    ColorAttachmentFormats.resize(PipelineDesc.NumRenderTargets);
+    for (Uint32 rt = 0; rt < PipelineDesc.NumRenderTargets; ++rt)
+    {
+        TEXTURE_FORMAT RTVFormat   = PipelineDesc.RTVFormats[rt];
+        ColorAttachmentFormats[rt] = TexFormatToVkFormat(RTVFormat);
+    }
+    PipelineRenderingCI.pColorAttachmentFormats = ColorAttachmentFormats.data();
+
+    TEXTURE_FORMAT DSVFormat = PipelineDesc.DSVFormat;
+    if (DSVFormat != TEX_FORMAT_UNKNOWN)
+    {
+        PipelineRenderingCI.depthAttachmentFormat = TexFormatToVkFormat(DSVFormat);
+        const TextureFormatAttribs& FmtAttribs    = GetTextureFormatAttribs(DSVFormat);
+        if (FmtAttribs.ComponentType == COMPONENT_TYPE_DEPTH_STENCIL)
+        {
+            PipelineRenderingCI.stencilAttachmentFormat = PipelineRenderingCI.depthAttachmentFormat;
+        }
+    }
+
+    return PipelineRenderingCI;
+}
+
+VkImageAspectFlags ComponentTypeToVkAspectMask(COMPONENT_TYPE ComponentType)
+{
+    switch (ComponentType)
+    {
+        case COMPONENT_TYPE_DEPTH:
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        case COMPONENT_TYPE_DEPTH_STENCIL:
+            return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+        default:
+            return VK_IMAGE_ASPECT_COLOR_BIT;
+    }
 }
 
 } // namespace Diligent

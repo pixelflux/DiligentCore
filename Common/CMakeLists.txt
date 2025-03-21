@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.6)
+cmake_minimum_required (VERSION 3.10)
 
 project(Diligent-Common CXX)
 
@@ -20,7 +20,9 @@ set(INTERFACE
     interface/FileWrapper.hpp
     interface/FilteringTools.hpp
     interface/FixedBlockMemoryAllocator.hpp
+    interface/GeometryPrimitives.h
     interface/HashUtils.hpp
+    interface/ImageTools.h
     interface/LRUCache.hpp
     interface/FixedLinearAllocator.hpp
     interface/DynamicLinearAllocator.hpp
@@ -29,11 +31,13 @@ set(INTERFACE
     interface/ObjectsRegistry.hpp
     interface/ParsingTools.hpp
     interface/RefCntAutoPtr.hpp
+    interface/RefCntContainer.hpp
     interface/RefCountedObjectImpl.hpp
     interface/Serializer.hpp
     interface/SpinLock.hpp
     interface/STDAllocator.hpp
     interface/StringDataBlobImpl.hpp
+    interface/ProxyDataBlob.hpp
     interface/StringTools.h
     interface/StringTools.hpp
     interface/StringPool.hpp
@@ -52,7 +56,10 @@ set(SOURCE
     src/BasicFileStream.cpp
     src/DataBlobImpl.cpp
     src/DefaultRawMemoryAllocator.cpp
+    src/FileWrapper.cpp
     src/FixedBlockMemoryAllocator.cpp
+    src/GeometryPrimitives.cpp
+    src/ImageTools.cpp
     src/MemoryFileStream.cpp
     src/Serializer.cpp
     src/SpinLock.cpp
@@ -79,7 +86,8 @@ if(PLATFORM_LINUX)
     target_link_libraries(Diligent-Common PRIVATE pthread)
 endif()
 
-set_common_target_properties(Diligent-Common)
+# c++ 17 is needed for aligned_alloc
+set_common_target_properties(Diligent-Common 17)
 
 source_group("src" FILES ${SOURCE})
 source_group("include" FILES ${INCLUDE})

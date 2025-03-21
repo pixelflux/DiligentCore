@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,10 +44,10 @@ namespace Diligent
 
 GLContextState::GLContextState(RenderDeviceGLImpl* pDeviceGL)
 {
-    const auto& AdapterInfo             = pDeviceGL->GetAdapterInfo();
-    m_Caps.IsFillModeSelectionSupported = AdapterInfo.Features.WireframeFill;
-    m_Caps.IsProgramPipelineSupported   = AdapterInfo.Features.SeparablePrograms;
-    m_Caps.IsDepthClampSupported        = AdapterInfo.Features.DepthClamp;
+    const GraphicsAdapterInfo& AdapterInfo = pDeviceGL->GetAdapterInfo();
+    m_Caps.IsFillModeSelectionSupported    = AdapterInfo.Features.WireframeFill;
+    m_Caps.IsProgramPipelineSupported      = AdapterInfo.Features.SeparablePrograms;
+    m_Caps.IsDepthClampSupported           = AdapterInfo.Features.DepthClamp;
 
     {
         m_Caps.MaxCombinedTexUnits = 0;
@@ -115,7 +115,7 @@ void GLContextState::Invalidate()
     for (Uint32 rt = 0; rt < _countof(m_ColorWriteMasks); ++rt)
         m_ColorWriteMasks[rt] = 0xFF;
 
-    m_bIndependentWriteMasks = EnableStateHelper();
+    m_bIndexedWriteMasks = EnableStateHelper();
 
     m_iActiveTexture   = -1;
     m_NumPatchVertices = -1;
@@ -328,7 +328,7 @@ void GLContextState::GetBoundImage(Uint32     Index,
 {
     if (Index < m_BoundImages.size())
     {
-        const auto& BoundImg = m_BoundImages[Index];
+        const BoundImageInfo& BoundImg = m_BoundImages[Index];
 
         ImgHandle = BoundImg.GLHandle;
         MipLevel  = BoundImg.MipLevel;
@@ -497,7 +497,7 @@ void GLContextState::SetDepthFunc(COMPARISON_FUNCTION CmpFunc)
 {
     if (m_DSState.m_DepthCmpFunc != CmpFunc)
     {
-        auto GlCmpFunc = CompareFuncToGLCompareFunc(CmpFunc);
+        GLenum GlCmpFunc = CompareFuncToGLCompareFunc(CmpFunc);
         glDepthFunc(GlCmpFunc);
         DEV_CHECK_GL_ERROR("Failed to set GL comparison function");
         m_DSState.m_DepthCmpFunc = CmpFunc;
@@ -533,15 +533,15 @@ void GLContextState::SetStencilWriteMask(Uint8 StencilWriteMask)
 
 void GLContextState::SetStencilRef(GLenum Face, Int32 Ref)
 {
-    auto& FaceStencilOp = m_DSState.m_StencilOpState[Face == GL_FRONT ? 0 : 1];
-    auto  GlStencilFunc = CompareFuncToGLCompareFunc(FaceStencilOp.Func);
+    DepthStencilGLState::StencilOpState& FaceStencilOp = m_DSState.m_StencilOpState[Face == GL_FRONT ? 0 : 1];
+    GLenum                               GlStencilFunc = CompareFuncToGLCompareFunc(FaceStencilOp.Func);
     glStencilFuncSeparate(Face, GlStencilFunc, Ref, FaceStencilOp.Mask);
     DEV_CHECK_GL_ERROR("Failed to set stencil function");
 }
 
 void GLContextState::SetStencilFunc(GLenum Face, COMPARISON_FUNCTION Func, Int32 Ref, Uint32 Mask)
 {
-    auto& FaceStencilOp = m_DSState.m_StencilOpState[Face == GL_FRONT ? 0 : 1];
+    DepthStencilGLState::StencilOpState& FaceStencilOp = m_DSState.m_StencilOpState[Face == GL_FRONT ? 0 : 1];
     if (FaceStencilOp.Func != Func ||
         FaceStencilOp.Ref != Ref ||
         FaceStencilOp.Mask != Mask)
@@ -556,14 +556,14 @@ void GLContextState::SetStencilFunc(GLenum Face, COMPARISON_FUNCTION Func, Int32
 
 void GLContextState::SetStencilOp(GLenum Face, STENCIL_OP StencilFailOp, STENCIL_OP StencilDepthFailOp, STENCIL_OP StencilPassOp)
 {
-    auto& FaceStencilOp = m_DSState.m_StencilOpState[Face == GL_FRONT ? 0 : 1];
+    DepthStencilGLState::StencilOpState& FaceStencilOp = m_DSState.m_StencilOpState[Face == GL_FRONT ? 0 : 1];
     if (FaceStencilOp.StencilFailOp != StencilFailOp ||
         FaceStencilOp.StencilDepthFailOp != StencilDepthFailOp ||
         FaceStencilOp.StencilPassOp != StencilPassOp)
     {
-        auto glsfail = StencilOp2GlStencilOp(StencilFailOp);
-        auto dpfail  = StencilOp2GlStencilOp(StencilDepthFailOp);
-        auto dppass  = StencilOp2GlStencilOp(StencilPassOp);
+        GLenum glsfail = StencilOp2GlStencilOp(StencilFailOp);
+        GLenum dpfail  = StencilOp2GlStencilOp(StencilDepthFailOp);
+        GLenum dppass  = StencilOp2GlStencilOp(StencilPassOp);
 
         glStencilOpSeparate(Face, glsfail, dpfail, dppass);
         DEV_CHECK_GL_ERROR("Failed to set stencil operation");
@@ -582,7 +582,7 @@ void GLContextState::SetFillMode(FILL_MODE FillMode)
         {
             if (glPolygonMode != nullptr)
             {
-                auto PolygonMode = FillMode == FILL_MODE_WIREFRAME ? GL_LINE : GL_FILL;
+                GLenum PolygonMode = FillMode == FILL_MODE_WIREFRAME ? GL_LINE : GL_FILL;
                 glPolygonMode(GL_FRONT_AND_BACK, PolygonMode);
                 DEV_CHECK_GL_ERROR("Failed to set polygon mode");
             }
@@ -616,7 +616,7 @@ void GLContextState::SetCullMode(CULL_MODE CullMode)
             VERIFY(CullMode == CULL_MODE_FRONT || CullMode == CULL_MODE_BACK, "Unexpected cull mode");
             glEnable(GL_CULL_FACE);
             DEV_CHECK_GL_ERROR("Failed to enable face culling");
-            auto CullFace = CullMode == CULL_MODE_BACK ? GL_BACK : GL_FRONT;
+            GLenum CullFace = CullMode == CULL_MODE_BACK ? GL_BACK : GL_FRONT;
             glCullFace(CullFace);
             DEV_CHECK_GL_ERROR("Failed to set cull face");
         }
@@ -629,7 +629,7 @@ void GLContextState::SetFrontFace(bool FrontCounterClockwise)
 {
     if (m_RSState.FrontCounterClockwise != FrontCounterClockwise)
     {
-        auto FrontFace = FrontCounterClockwise ? GL_CCW : GL_CW;
+        GLenum FrontFace = FrontCounterClockwise ? GL_CCW : GL_CW;
         glFrontFace(FrontFace);
         DEV_CHECK_GL_ERROR("Failed to set front face");
         m_RSState.FrontCounterClockwise = FrontCounterClockwise;
@@ -717,35 +717,62 @@ void GLContextState::SetBlendFactors(const float* BlendFactors)
     DEV_CHECK_GL_ERROR("Failed to set blend color");
 }
 
-void GLContextState::SetBlendState(const BlendStateDesc& BSDsc, Uint32 SampleMask)
+void GLContextState::SetBlendState(const BlendStateDesc& BSDsc, Uint32 RenderTargetMask, Uint32 SampleMask)
 {
     if (SampleMask != 0xFFFFFFFF)
         LOG_ERROR_MESSAGE("Sample mask is not currently implemented in GL backend");
 
-    bool bEnableBlend = false;
-    if (BSDsc.IndependentBlendEnable)
-    {
-        for (int i = 0; i < static_cast<int>(MAX_RENDER_TARGETS); ++i)
-        {
-            const auto& RT = BSDsc.RenderTargets[i];
-            if (RT.BlendEnable)
-                bEnableBlend = true;
+    bool       bEnableBlend               = BSDsc.RenderTargets[0].BlendEnable;
+    bool       bUseIndexedColorWriteMasks = false;
+    COLOR_MASK NonIndexedColorMask        = COLOR_MASK_NONE;
 
-            if (i < m_Caps.MaxDrawBuffers)
-            {
-                SetColorWriteMask(i, RT.RenderTargetWriteMask, True);
-            }
-            else
-            {
-                VERIFY(RT.RenderTargetWriteMask == RenderTargetBlendDesc().RenderTargetWriteMask, "Render target write mask is specified for buffer ", i, " but this device only supports ", m_Caps.MaxDrawBuffers, " draw buffers");
-            }
+    if (RenderTargetMask & ~((1u << MAX_RENDER_TARGETS) - 1u))
+    {
+        UNEXPECTED("Render target mask (", RenderTargetMask, ") contains bits that correspond to non-existent render targets");
+        RenderTargetMask &= (1u << MAX_RENDER_TARGETS) - 1u;
+    }
+
+    if (RenderTargetMask & ~((1u << m_Caps.MaxDrawBuffers) - 1u))
+    {
+        LOG_ERROR_MESSAGE("Render target mask (", RenderTargetMask, ") contains buffer ", PlatformMisc::GetLSB(RenderTargetMask), " but this device only supports ", m_Caps.MaxDrawBuffers, " draw buffers");
+        RenderTargetMask &= (1u << m_Caps.MaxDrawBuffers) - 1u;
+    }
+
+    for (Uint32 Mask = RenderTargetMask; Mask != 0;)
+    {
+        Uint32 rt = PlatformMisc::GetLSB(Mask);
+        Mask &= ~(1u << rt);
+        VERIFY_EXPR(rt < MAX_RENDER_TARGETS && static_cast<int>(rt) < m_Caps.MaxDrawBuffers);
+
+        const RenderTargetBlendDesc& RT = BSDsc.RenderTargets[rt];
+        VERIFY(RT.RenderTargetWriteMask != COLOR_MASK_NONE, "Render target write mask should not be COLOR_MASK_NONE if corresponding bit is set in RenderTargetMask");
+        if (NonIndexedColorMask == COLOR_MASK_NONE)
+        {
+            NonIndexedColorMask = RT.RenderTargetWriteMask;
+        }
+        else if (NonIndexedColorMask != RT.RenderTargetWriteMask)
+        {
+            bUseIndexedColorWriteMasks = true;
+        }
+
+        if (BSDsc.IndependentBlendEnable && RT.BlendEnable)
+            bEnableBlend = true;
+    }
+
+    if (bUseIndexedColorWriteMasks)
+    {
+        for (Uint32 Mask = RenderTargetMask; Mask != 0;)
+        {
+            Uint32 rt = PlatformMisc::GetLSB(Mask);
+            Mask &= ~(1u << rt);
+            VERIFY_EXPR(rt < MAX_RENDER_TARGETS && static_cast<int>(rt) < m_Caps.MaxDrawBuffers);
+            SetColorWriteMaskIndexed(rt, BSDsc.RenderTargets[rt].RenderTargetWriteMask);
         }
     }
-    else
+    else if (NonIndexedColorMask != COLOR_MASK_NONE)
     {
-        const auto& RT0 = BSDsc.RenderTargets[0];
-        bEnableBlend    = RT0.BlendEnable;
-        SetColorWriteMask(0, RT0.RenderTargetWriteMask, False);
+        // If the color write mask is COLOR_MASK_NONE, the draw buffer is disabled with glDrawBuffer.
+        SetColorWriteMask(NonIndexedColorMask);
     }
 
     if (bEnableBlend)
@@ -769,7 +796,7 @@ void GLContextState::SetBlendState(const BlendStateDesc& BSDsc, Uint32 SampleMas
         {
             for (int i = 0; i < static_cast<int>(MAX_RENDER_TARGETS); ++i)
             {
-                const auto& RT = BSDsc.RenderTargets[i];
+                const RenderTargetBlendDesc& RT = BSDsc.RenderTargets[i];
 
                 if (i >= m_Caps.MaxDrawBuffers)
                 {
@@ -783,14 +810,14 @@ void GLContextState::SetBlendState(const BlendStateDesc& BSDsc, Uint32 SampleMas
                     glEnablei(GL_BLEND, i);
                     DEV_CHECK_GL_ERROR("Failed to enable alpha blending");
 
-                    auto srcFactorRGB   = BlendFactor2GLBlend(RT.SrcBlend);
-                    auto dstFactorRGB   = BlendFactor2GLBlend(RT.DestBlend);
-                    auto srcFactorAlpha = BlendFactor2GLBlend(RT.SrcBlendAlpha);
-                    auto dstFactorAlpha = BlendFactor2GLBlend(RT.DestBlendAlpha);
+                    GLenum srcFactorRGB   = BlendFactor2GLBlend(RT.SrcBlend);
+                    GLenum dstFactorRGB   = BlendFactor2GLBlend(RT.DestBlend);
+                    GLenum srcFactorAlpha = BlendFactor2GLBlend(RT.SrcBlendAlpha);
+                    GLenum dstFactorAlpha = BlendFactor2GLBlend(RT.DestBlendAlpha);
                     glBlendFuncSeparatei(i, srcFactorRGB, dstFactorRGB, srcFactorAlpha, dstFactorAlpha);
                     DEV_CHECK_GL_ERROR("Failed to set separate blending factors");
-                    auto modeRGB   = BlendOperation2GLBlendOp(RT.BlendOp);
-                    auto modeAlpha = BlendOperation2GLBlendOp(RT.BlendOpAlpha);
+                    GLenum modeRGB   = BlendOperation2GLBlendOp(RT.BlendOp);
+                    GLenum modeAlpha = BlendOperation2GLBlendOp(RT.BlendOpAlpha);
                     glBlendEquationSeparatei(i, modeRGB, modeAlpha);
                     DEV_CHECK_GL_ERROR("Failed to set separate blending equations");
                 }
@@ -803,16 +830,17 @@ void GLContextState::SetBlendState(const BlendStateDesc& BSDsc, Uint32 SampleMas
         }
         else
         {
-            const auto& RT0            = BSDsc.RenderTargets[0];
-            auto        srcFactorRGB   = BlendFactor2GLBlend(RT0.SrcBlend);
-            auto        dstFactorRGB   = BlendFactor2GLBlend(RT0.DestBlend);
-            auto        srcFactorAlpha = BlendFactor2GLBlend(RT0.SrcBlendAlpha);
-            auto        dstFactorAlpha = BlendFactor2GLBlend(RT0.DestBlendAlpha);
+            const RenderTargetBlendDesc& RT0 = BSDsc.RenderTargets[0];
+
+            GLenum srcFactorRGB   = BlendFactor2GLBlend(RT0.SrcBlend);
+            GLenum dstFactorRGB   = BlendFactor2GLBlend(RT0.DestBlend);
+            GLenum srcFactorAlpha = BlendFactor2GLBlend(RT0.SrcBlendAlpha);
+            GLenum dstFactorAlpha = BlendFactor2GLBlend(RT0.DestBlendAlpha);
             glBlendFuncSeparate(srcFactorRGB, dstFactorRGB, srcFactorAlpha, dstFactorAlpha);
             DEV_CHECK_GL_ERROR("Failed to set blending factors");
 
-            auto modeRGB   = BlendOperation2GLBlendOp(RT0.BlendOp);
-            auto modeAlpha = BlendOperation2GLBlendOp(RT0.BlendOpAlpha);
+            GLenum modeRGB   = BlendOperation2GLBlendOp(RT0.BlendOp);
+            GLenum modeAlpha = BlendOperation2GLBlendOp(RT0.BlendOpAlpha);
             glBlendEquationSeparate(modeRGB, modeAlpha);
             DEV_CHECK_GL_ERROR("Failed to set blending equations");
         }
@@ -825,55 +853,57 @@ void GLContextState::SetBlendState(const BlendStateDesc& BSDsc, Uint32 SampleMas
     }
 }
 
-void GLContextState::SetColorWriteMask(Uint32 RTIndex, Uint32 WriteMask, Bool bIsIndependent)
+void GLContextState::SetColorWriteMask(Uint32 WriteMask)
 {
     // Even though the write mask only applies to writes to a framebuffer, the mask state is NOT
     // Framebuffer state. So it is NOT part of a Framebuffer Object or the Default Framebuffer.
     // Binding a new framebuffer will NOT affect the mask.
+    if (!m_bIndexedWriteMasks && m_ColorWriteMasks[0] == WriteMask)
+        return;
 
-    if (!bIsIndependent)
-        RTIndex = 0;
+    // glColorMask() sets the mask for ALL draw buffers
+    glColorMask(
+        (WriteMask & COLOR_MASK_RED) ? GL_TRUE : GL_FALSE,
+        (WriteMask & COLOR_MASK_GREEN) ? GL_TRUE : GL_FALSE,
+        (WriteMask & COLOR_MASK_BLUE) ? GL_TRUE : GL_FALSE,
+        (WriteMask & COLOR_MASK_ALPHA) ? GL_TRUE : GL_FALSE);
+    DEV_CHECK_GL_ERROR("Failed to set GL color mask");
 
-    if (m_ColorWriteMasks[RTIndex] != WriteMask ||
-        m_bIndependentWriteMasks != bIsIndependent)
-    {
-        if (bIsIndependent)
-        {
-            // Note that glColorMaski() does not set color mask for the framebuffer
-            // attachment point RTIndex. Rather it sets the mask for what was set
-            // by the glDrawBuffers() function for the i-th output
-            glColorMaski(RTIndex,
-                         (WriteMask & COLOR_MASK_RED) ? GL_TRUE : GL_FALSE,
-                         (WriteMask & COLOR_MASK_GREEN) ? GL_TRUE : GL_FALSE,
-                         (WriteMask & COLOR_MASK_BLUE) ? GL_TRUE : GL_FALSE,
-                         (WriteMask & COLOR_MASK_ALPHA) ? GL_TRUE : GL_FALSE);
-            DEV_CHECK_GL_ERROR("Failed to set GL color mask");
+    for (size_t rt = 0; rt < _countof(m_ColorWriteMasks); ++rt)
+        m_ColorWriteMasks[rt] = WriteMask;
 
-            m_ColorWriteMasks[RTIndex] = WriteMask;
-        }
-        else
-        {
-            // glColorMask() sets the mask for ALL draw buffers
-            glColorMask(
-                (WriteMask & COLOR_MASK_RED) ? GL_TRUE : GL_FALSE,
-                (WriteMask & COLOR_MASK_GREEN) ? GL_TRUE : GL_FALSE,
-                (WriteMask & COLOR_MASK_BLUE) ? GL_TRUE : GL_FALSE,
-                (WriteMask & COLOR_MASK_ALPHA) ? GL_TRUE : GL_FALSE);
-            DEV_CHECK_GL_ERROR("Failed to set GL color mask");
-
-            for (size_t rt = 0; rt < _countof(m_ColorWriteMasks); ++rt)
-                m_ColorWriteMasks[rt] = WriteMask;
-        }
-        m_bIndependentWriteMasks = bIsIndependent;
-    }
+    m_bIndexedWriteMasks = false;
 }
 
-void GLContextState::GetColorWriteMask(Uint32 RTIndex, Uint32& WriteMask, Bool& bIsIndependent)
+void GLContextState::SetColorWriteMaskIndexed(Uint32 RTIndex, Uint32 WriteMask)
 {
-    if (!m_bIndependentWriteMasks)
-        RTIndex = 0;
-    WriteMask      = m_ColorWriteMasks[RTIndex];
-    bIsIndependent = m_bIndependentWriteMasks;
+    // Even though the write mask only applies to writes to a framebuffer, the mask state is NOT
+    // Framebuffer state. So it is NOT part of a Framebuffer Object or the Default Framebuffer.
+    // Binding a new framebuffer will NOT affect the mask.
+    if (m_ColorWriteMasks[RTIndex] == WriteMask)
+        return;
+
+    // Note that glColorMaski() does not set color mask for the framebuffer
+    // attachment point RTIndex. Rather it sets the mask for what was set
+    // by the glDrawBuffers() function for the i-th output
+    glColorMaski(RTIndex,
+                 (WriteMask & COLOR_MASK_RED) ? GL_TRUE : GL_FALSE,
+                 (WriteMask & COLOR_MASK_GREEN) ? GL_TRUE : GL_FALSE,
+                 (WriteMask & COLOR_MASK_BLUE) ? GL_TRUE : GL_FALSE,
+                 (WriteMask & COLOR_MASK_ALPHA) ? GL_TRUE : GL_FALSE);
+    DEV_CHECK_GL_ERROR("Failed to set GL color mask");
+
+    m_ColorWriteMasks[RTIndex] = WriteMask;
+
+    m_bIndexedWriteMasks = true;
+}
+
+void GLContextState::GetColorWriteMask(Uint32 RTIndex, Uint32& WriteMask, Bool& bIsIndexed)
+{
+    WriteMask = m_ColorWriteMasks[RTIndex];
+    if (WriteMask == 0xFF)
+        WriteMask = 0xF;
+    bIsIndexed = m_bIndexedWriteMasks;
 }
 
 void GLContextState::SetNumPatchVertices(Int32 NumVertices)

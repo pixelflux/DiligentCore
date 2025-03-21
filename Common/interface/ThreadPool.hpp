@@ -62,6 +62,18 @@ struct ThreadPoolCreateInfo
 
 RefCntAutoPtr<IThreadPool> CreateThreadPool(const ThreadPoolCreateInfo& ThreadPoolCI);
 
+/// Pins the worker thread to one of the allowed cores.
+///
+/// \param ThreadId         - The thread ID.
+/// \param AllowedCoresMask - The bit mask of allowed cores.
+/// \return                 - Previous thread affinity mask, or 0 if the function failed.
+///
+/// \remarks    The function selects the core by looping through the bits in the AllowedCoresMask.
+///             For example, if cores 1, 3, 6 are allowed by the mask, the threads will be assigned
+///             to cores 1, 3, 6, 1, 3, 6, etc.
+///
+///             This function can be used as the OnThreadStarted callback in the ThreadPoolCreateInfo.
+Uint64 PinWorkerThread(Uint32 ThreadId, Uint64 AllowedCoresMask);
 
 /// Base implementation of the IAsyncTask interface.
 class AsyncTaskBase : public ObjectBase<IAsyncTask>
@@ -95,7 +107,8 @@ public:
                     break;
 
                 case ASYNC_TASK_STATUS_NOT_STARTED:
-                    DEV_ERROR("NOT_STARTED is only allowed as initial task status.");
+                    DEV_CHECK_ERR(m_TaskStatus == ASYNC_TASK_STATUS_RUNNING,
+                                  "A task should only be moved to NOT_STARTED state from RUNNING state.");
                     break;
 
                 case ASYNC_TASK_STATUS_RUNNING:
@@ -165,6 +178,9 @@ private:
 };
 
 
+/// Enqueues a function to be executed asynchronously by the thread pool.
+/// For the list of parameters, see Diligent::IThreadPool::EnqueueTask() method.
+/// The handler function must return the task status, see Diligent::IAsyncTask::Run() method.
 template <typename HanlderType>
 RefCntAutoPtr<IAsyncTask> EnqueueAsyncWork(IThreadPool* pThreadPool,
                                            IAsyncTask** ppPrerequisites,
@@ -182,10 +198,11 @@ RefCntAutoPtr<IAsyncTask> EnqueueAsyncWork(IThreadPool* pThreadPool,
             m_Handler{std::move(Handler)}
         {}
 
-        virtual void DILIGENT_CALL_TYPE Run(Uint32 ThreadId) override final
+        virtual ASYNC_TASK_STATUS DILIGENT_CALL_TYPE Run(Uint32 ThreadId) override final
         {
-            m_Handler(ThreadId);
-            SetStatus(ASYNC_TASK_STATUS_COMPLETE);
+            return !m_bSafelyCancel.load() ?
+                m_Handler(ThreadId) :
+                ASYNC_TASK_STATUS_CANCELLED;
         }
 
     private:

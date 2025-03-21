@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2024 Diligent Graphics LLC
+ *  Copyright 2023-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@
 #    include "GLSLangUtils.hpp"
 #endif
 
-#if PLATFORM_EMSCRIPTEN
+#if PLATFORM_WEB
 #    include <emscripten.h>
 #endif
 
@@ -67,46 +67,46 @@ class ShaderBindingTableWebGPUImpl
 class DeviceMemoryWebGPUImpl
 {};
 
+#if PLATFORM_WEB
 static void DebugMessengerCallback(WGPUErrorType MessageType, const char* Message, void* pUserData)
 {
     if (Message != nullptr)
         LOG_DEBUG_MESSAGE(DEBUG_MESSAGE_SEVERITY_ERROR, "WebGPU: ", Message);
 }
+#endif
 
-RenderDeviceWebGPUImpl::RenderDeviceWebGPUImpl(IReferenceCounters*           pRefCounters,
-                                               IMemoryAllocator&             RawMemAllocator,
-                                               IEngineFactory*               pEngineFactory,
-                                               const EngineWebGPUCreateInfo& EngineCI,
-                                               const GraphicsAdapterInfo&    AdapterInfo,
-                                               WGPUInstance                  wgpuInstance,
-                                               WGPUAdapter                   wgpuAdapter,
-                                               WGPUDevice                    wgpuDevice) :
+RenderDeviceWebGPUImpl::RenderDeviceWebGPUImpl(IReferenceCounters* pRefCounters,
+                                               const CreateInfo&   CI) :
 
     // clang-format off
     TRenderDeviceBase
     {
         pRefCounters,
-        RawMemAllocator,
-        pEngineFactory,
-        EngineCI,
-        AdapterInfo
+        CI.RawMemAllocator,
+        CI.pEngineFactory,
+        CI.EngineCI,
+        CI.AdapterInfo
     },
-    m_wgpuInstance(wgpuInstance),
-    m_wgpuAdapter{wgpuAdapter},
-    m_wgpuDevice{wgpuDevice}
+    m_wgpuInstance(CI.wgpuInstance),
+    m_wgpuAdapter{CI.wgpuAdapter},
+    m_wgpuDevice{CI.wgpuDevice}
 // clang-format on
 {
     WGPUSupportedLimits wgpuSupportedLimits{};
     wgpuDeviceGetLimits(m_wgpuDevice, &wgpuSupportedLimits);
     m_wgpuLimits = wgpuSupportedLimits.limits;
 
+#if PLATFORM_WEB
     wgpuDeviceSetUncapturedErrorCallback(m_wgpuDevice, DebugMessengerCallback, nullptr);
+#endif
     FindSupportedTextureFormats();
 
     m_DeviceInfo.Type = RENDER_DEVICE_TYPE_WEBGPU;
     m_DeviceInfo.NDC  = NDCAttribs{0.0f, 1.0f, -0.5f};
 
-    m_DeviceInfo.Features = EnableDeviceFeatures(m_AdapterInfo.Features, EngineCI.Features);
+    const EngineWebGPUCreateInfo& EngineCI{CI.EngineCI};
+
+    m_DeviceInfo.Features = EnableDeviceFeatures(CI.EnabledFeatures, EngineCI.Features);
 
     m_pUploadMemoryManager  = std::make_unique<UploadMemoryManagerWebGPU>(m_wgpuDevice, EngineCI.UploadHeapPageSize);
     m_pDynamicMemoryManager = std::make_unique<DynamicMemoryManagerWebGPU>(m_wgpuDevice, EngineCI.DynamicHeapPageSize, EngineCI.DynamicHeapSize);
@@ -126,7 +126,7 @@ RenderDeviceWebGPUImpl::~RenderDeviceWebGPUImpl()
 #if !DILIGENT_NO_GLSLANG
     GLSLangUtils::FinalizeGlslang();
 #endif
-#if !PLATFORM_EMSCRIPTEN
+#if !PLATFORM_WEB
     IdleGPU();
 #endif
 }
@@ -270,6 +270,12 @@ void RenderDeviceWebGPUImpl::CreatePipelineStateCache(const PipelineStateCacheCr
     *ppPSOCache = nullptr;
 }
 
+void RenderDeviceWebGPUImpl::CreateDeferredContext(IDeviceContext** ppContext)
+{
+    LOG_ERROR_MESSAGE("Deferred contexts are not supported in WebGPU.");
+    *ppContext = nullptr;
+}
+
 SparseTextureFormatInfo RenderDeviceWebGPUImpl::GetSparseTextureFormatInfo(TEXTURE_FORMAT     TexFormat,
                                                                            RESOURCE_DIMENSION Dimension,
                                                                            Uint32             SampleCount) const
@@ -295,11 +301,11 @@ WGPUDevice RenderDeviceWebGPUImpl::GetWebGPUDevice() const
 
 void RenderDeviceWebGPUImpl::IdleGPU()
 {
-#if PLATFORM_EMSCRIPTEN
+#if PLATFORM_WEB
     LOG_ERROR_MESSAGE("IRenderDevice::IdleGPU() is not supported on the Web. Use non-blocking synchronization methods.");
 #else
     VERIFY_EXPR(m_wpImmediateContexts.size() == 1);
-    if (auto pImmediateCtx = m_wpImmediateContexts[0].Lock())
+    if (RefCntAutoPtr<DeviceContextWebGPUImpl> pImmediateCtx = m_wpImmediateContexts[0].Lock())
         pImmediateCtx->WaitForIdle();
 #endif
 }
@@ -358,7 +364,7 @@ DynamicMemoryManagerWebGPU::Page RenderDeviceWebGPUImpl::GetDynamicMemoryPage(si
 
 void RenderDeviceWebGPUImpl::DeviceTick()
 {
-#if !PLATFORM_EMSCRIPTEN
+#if !PLATFORM_WEB
     wgpuDeviceTick(m_wgpuDevice);
 #endif
 }
@@ -428,6 +434,7 @@ void RenderDeviceWebGPUImpl::FindSupportedTextureFormats()
     const bool RG11B10UfloatRenderableSupported = wgpuDeviceHasFeature(m_wgpuDevice, WGPUFeatureName_RG11B10UfloatRenderable);
     const bool Depth32FloatStencil8Supported    = wgpuDeviceHasFeature(m_wgpuDevice, WGPUFeatureName_Depth32FloatStencil8);
     const bool TextureCompressionBCSupported    = wgpuDeviceHasFeature(m_wgpuDevice, WGPUFeatureName_TextureCompressionBC);
+    const bool TextureCompressionETC2Supported  = wgpuDeviceHasFeature(m_wgpuDevice, WGPUFeatureName_TextureCompressionETC2);
     const bool R16UnormSupported                = wgpuDeviceHasFeature(m_wgpuDevice, WGPUFeatureName_Unorm16TextureFormats);
     const bool R16SnormSupported                = wgpuDeviceHasFeature(m_wgpuDevice, WGPUFeatureName_Snorm16TextureFormats);
 
@@ -524,6 +531,17 @@ void RenderDeviceWebGPUImpl::FindSupportedTextureFormats()
         SetTexFormatInfo({TEX_FORMAT_R16_SNORM}, BIND_SR, FMT_FLAG_FILTER | FMT_FLAG_MSAA);
         SetTexFormatInfo({TEX_FORMAT_RG16_SNORM}, BIND_SR, FMT_FLAG_FILTER | FMT_FLAG_MSAA);
         SetTexFormatInfo({TEX_FORMAT_RGBA16_SNORM}, BIND_SR, FMT_FLAG_FILTER | FMT_FLAG_MSAA);
+    }
+
+    if (TextureCompressionETC2Supported)
+    {
+        SetTexFormatInfo({TEX_FORMAT_ETC2_RGB8_UNORM,
+                          TEX_FORMAT_ETC2_RGB8_UNORM_SRGB,
+                          TEX_FORMAT_ETC2_RGB8A1_UNORM,
+                          TEX_FORMAT_ETC2_RGB8A1_UNORM_SRGB,
+                          TEX_FORMAT_ETC2_RGBA8_UNORM,
+                          TEX_FORMAT_ETC2_RGBA8_UNORM_SRGB},
+                         BIND_S, FMT_FLAG_FILTER);
     }
 }
 

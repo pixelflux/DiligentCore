@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +34,7 @@
 #include "../../Primitives/interface/BasicTypes.h"
 #include "../../Primitives/interface/DataBlob.h"
 #include "../../Primitives/interface/MemoryAllocator.h"
+#include "STDAllocator.hpp"
 #include "RefCntAutoPtr.hpp"
 #include "ObjectBase.hpp"
 
@@ -44,9 +45,12 @@ namespace Diligent
 class DataBlobImpl final : public Diligent::ObjectBase<IDataBlob>
 {
 public:
-    typedef ObjectBase<IDataBlob> TBase;
+    using TBase          = ObjectBase<IDataBlob>;
+    using DataBufferType = std::vector<Uint8, STDAllocatorRawMem<Uint8>>;
 
     static RefCntAutoPtr<DataBlobImpl> Create(size_t InitialSize = 0, const void* pData = nullptr);
+    static RefCntAutoPtr<DataBlobImpl> Create(IMemoryAllocator* pAllocator, size_t InitialSize = 0, const void* pData = nullptr);
+    static RefCntAutoPtr<DataBlobImpl> Create(DataBufferType&& DataBuff) noexcept;
     static RefCntAutoPtr<DataBlobImpl> MakeCopy(const IDataBlob* pDataBlob);
 
     ~DataBlobImpl() override;
@@ -60,31 +64,37 @@ public:
     virtual size_t DILIGENT_CALL_TYPE GetSize() const override;
 
     /// Returns the pointer to the internal data buffer
-    virtual void* DILIGENT_CALL_TYPE GetDataPtr() override;
+    virtual void* DILIGENT_CALL_TYPE GetDataPtr(size_t Offset = 0) override;
 
     /// Returns const pointer to the internal data buffer
-    virtual const void* DILIGENT_CALL_TYPE GetConstDataPtr() const override;
+    virtual const void* DILIGENT_CALL_TYPE GetConstDataPtr(size_t Offset = 0) const override;
 
     template <typename T>
-    T* GetDataPtr()
+    T* GetDataPtr(size_t Offset = 0)
     {
-        return reinterpret_cast<T*>(GetDataPtr());
+        return reinterpret_cast<T*>(GetDataPtr(Offset));
     }
 
     template <typename T>
-    const T* GetConstDataPtr() const
+    const T* GetConstDataPtr(size_t Offset = 0) const
     {
-        return reinterpret_cast<const T*>(GetConstDataPtr());
+        return reinterpret_cast<const T*>(GetConstDataPtr(Offset));
     }
 
 private:
     template <typename AllocatorType, typename ObjectType>
     friend class MakeNewRCObj;
 
-    explicit DataBlobImpl(IReferenceCounters* pRefCounters, size_t InitialSize = 0, const void* pData = nullptr);
+    DataBlobImpl(IReferenceCounters* pRefCounters,
+                 IMemoryAllocator&   Allocator,
+                 size_t              InitialSize = 0,
+                 const void*         pData       = nullptr);
+
+    DataBlobImpl(IReferenceCounters* pRefCounters,
+                 DataBufferType&&    DataBuff) noexcept;
 
 private:
-    std::vector<Uint8> m_DataBuff;
+    DataBufferType m_DataBuff;
 };
 
 class DataBlobAllocatorAdapter final : public IMemoryAllocator
@@ -93,6 +103,10 @@ public:
     virtual void* Allocate(size_t Size, const Char* dbgDescription, const char* dbgFileName, const Int32 dbgLineNumber) override final;
 
     virtual void Free(void* Ptr) override final;
+
+    virtual void* AllocateAligned(size_t Size, size_t Alignment, const Char* dbgDescription, const char* dbgFileName, const Int32 dbgLineNumber) override final;
+
+    virtual void FreeAligned(void* Ptr) override final;
 
     RefCntAutoPtr<DataBlobImpl> Release() { return std::move(m_pDataBlob); };
 

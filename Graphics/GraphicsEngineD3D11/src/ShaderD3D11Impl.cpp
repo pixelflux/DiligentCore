@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,12 +54,17 @@ static const ShaderVersion HLSLValidateShaderVersion(const ShaderVersion& Versio
 
 static const ShaderVersion GetD3D11ShaderModel(D3D_FEATURE_LEVEL d3dDeviceFeatureLevel, const ShaderVersion& HLSLVersion)
 {
+#if defined(_MSC_VER) && !defined(NTDDI_WIN10_FE)
+#    pragma warning(push)
+#    pragma warning(disable : 4063)
+#endif
     switch (d3dDeviceFeatureLevel)
     {
         // Direct3D11 only supports shader model 5.0 even if the device feature level is
         // above 11.0 (for example, 11.1 or 12.0).
         // https://docs.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-devices-downlevel-intro#overview-for-each-feature-level
 #if defined(_WIN32_WINNT_WIN10) && (_WIN32_WINNT >= _WIN32_WINNT_WIN10)
+        case D3D_FEATURE_LEVEL_12_2:
         case D3D_FEATURE_LEVEL_12_1:
         case D3D_FEATURE_LEVEL_12_0:
 #endif
@@ -83,6 +88,9 @@ static const ShaderVersion GetD3D11ShaderModel(D3D_FEATURE_LEVEL d3dDeviceFeatur
             UNEXPECTED("Unexpected D3D feature level ", static_cast<Uint32>(d3dDeviceFeatureLevel));
             return ShaderVersion{4, 0};
     }
+#if defined(_MSC_VER) && !defined(NTDDI_WIN10_FE)
+#    pragma warning(pop)
+#endif
 }
 
 ShaderD3D11Impl::ShaderD3D11Impl(IReferenceCounters*     pRefCounters,
@@ -99,9 +107,9 @@ ShaderD3D11Impl::ShaderD3D11Impl(IReferenceCounters*     pRefCounters,
         IsDeviceInternal,
         GetD3D11ShaderModel(D3D11ShaderCI.FeatureLevel, ShaderCI.HLSLVersion),
         [LoadConstantBufferReflection = ShaderCI.LoadConstantBufferReflection](const ShaderDesc& Desc, IDataBlob* pShaderByteCode) {
-            auto& Allocator  = GetRawAllocator();
-            auto* pRawMem    = ALLOCATE(Allocator, "Allocator for ShaderResources", ShaderResourcesD3D11, 1);
-            auto* pResources = new (pRawMem) ShaderResourcesD3D11 //
+            IMemoryAllocator&     Allocator  = GetRawAllocator();
+            ShaderResourcesD3D11* pRawMem    = ALLOCATE(Allocator, "Allocator for ShaderResources", ShaderResourcesD3D11, 1);
+            ShaderResourcesD3D11* pResources = new (pRawMem) ShaderResourcesD3D11 //
                 {
                     pShaderByteCode,
                     Desc,
@@ -148,9 +156,7 @@ ID3D11DeviceChild* ShaderD3D11Impl::GetD3D11Shader(IDataBlob* pBytecode) noexcep
         return it->second;
     }
 
-    VERIFY(pBytecode->GetSize() == m_pShaderByteCode->GetSize(), "The byte code size does not match the size of the original byte code");
-
-    auto* pd3d11Device = GetDevice()->GetD3D11Device();
+    ID3D11Device* pd3d11Device = GetDevice()->GetD3D11Device();
 
     CComPtr<ID3D11DeviceChild> pd3d11Shader;
     switch (m_Desc.ShaderType)
@@ -185,7 +191,7 @@ ID3D11DeviceChild* ShaderD3D11Impl::GetD3D11Shader(IDataBlob* pBytecode) noexcep
 
     if (*m_Desc.Name != 0)
     {
-        auto hr = pd3d11Shader->SetPrivateData(WKPDID_D3DDebugObjectName, static_cast<UINT>(strlen(m_Desc.Name)), m_Desc.Name);
+        HRESULT hr = pd3d11Shader->SetPrivateData(WKPDID_D3DDebugObjectName, static_cast<UINT>(strlen(m_Desc.Name)), m_Desc.Name);
         DEV_CHECK_ERR(SUCCEEDED(hr), "Failed to set shader name");
     }
 

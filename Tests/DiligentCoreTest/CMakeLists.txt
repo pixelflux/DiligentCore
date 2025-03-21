@@ -1,6 +1,6 @@
-cmake_minimum_required (VERSION 3.6)
+cmake_minimum_required (VERSION 3.10)
 
-if (PLATFORM_EMSCRIPTEN)
+if (PLATFORM_WEB)
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
 endif()
 
@@ -32,9 +32,9 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 add_executable(DiligentCoreTest ${SOURCE} ${SHADERS})
-set_common_target_properties(DiligentCoreTest)
+set_common_target_properties(DiligentCoreTest 17)
 
-if (PLATFORM_EMSCRIPTEN)  
+if (PLATFORM_WEB)  
     set(RESOURCE_PATH "${PROJECT_SOURCE_DIR}/assets/")
     set(HTML_TEMPLATE_FILE ${PROJECT_SOURCE_DIR}/resources/emscripten_template.html)      
     target_link_options(DiligentCoreTest PRIVATE "SHELL: -s SINGLE_FILE -s ALLOW_MEMORY_GROWTH=1 --preload-file '${RESOURCE_PATH}@'")      
@@ -62,8 +62,6 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE} ${SHADERS}})
 
 set_target_properties(DiligentCoreTest
     PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
         VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         XCODE_SCHEME_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets"
 )
